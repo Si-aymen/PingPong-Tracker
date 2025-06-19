@@ -1,0 +1,32 @@
+{
+  "name": "pingpong-app",
+  "version": "1.0.0",
+  "description": "Application web simple pour suivre les scores de ping-pong",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "debug": "node --inspect server.js",
+    "setup": "node init-db.js", 
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ping-pong",
+    "scores",
+    "tracker",
+    "nodejs",
+    "express"
+  ],
+  "author": "Aymen Rahali",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.1",
+    "path": "^0.12.7",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
