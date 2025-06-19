@@ -11,97 +11,108 @@
 
 <body>
     <div class="container">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <h1><i class="fas fa-table-tennis"></i> PingPong Tracker</h1>
                 <p>Suivez vos scores de ping-pong en temps réel</p>
             </div>
+            <div class="auth-buttons">
+                <button class="btn btn-primary" id="show-login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Se connecter
+                </button>
+                <button class="btn btn-secondary" id="show-register-btn">
+                    <i class="fas fa-user-plus"></i> S'inscrire
+                </button>
+                <button class="btn btn-danger" id="logout-btn" style="display: none;">
+                    <i class="fas fa-sign-out-alt"></i> Déconnexion
+                </button>
+            </div>
         </header>
 
-        <!-- Navigation -->
-        <nav class="nav-tabs">
-            <button class="tab-btn active" data-tab="dashboard">
-                <i class="fas fa-chart-line"></i> Tableau de bord
-            </button>
-            <button class="tab-btn" data-tab="users">
-                <i class="fas fa-users"></i> Joueurs
-            </button>
-            <button class="tab-btn" data-tab="matches">
-                <i class="fas fa-trophy"></i> Matchs
-            </button>
-        </nav>
+        <div id="app-content" style="display: none;">
+            <nav class="nav-tabs">
+                <button class="tab-btn active" data-tab="dashboard">
+                    <i class="fas fa-chart-line"></i> Tableau de bord
+                </button>
+                <button class="tab-btn" data-tab="users">
+                    <i class="fas fa-users"></i> Joueurs
+                </button>
+                <button class="tab-btn" data-tab="matches">
+                    <i class="fas fa-trophy"></i> Matchs
+                </button>
+            </nav>
 
-        <!-- Dashboard Tab -->
-        <div id="dashboard" class="tab-content active">
-            <div class="dashboard-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-users"></i>
+            <div id="dashboard" class="tab-content active">
+                <div class="dashboard-grid">
+                    <div class="dashboard-card total-users-card">
+                        <h3><i class="fas fa-users"></i> Nombre total de joueurs</h3>
+                        <p id="total-users">0</p>
                     </div>
-                    <div class="stat-info">
-                        <h3 id="total-users">0</h3>
-                        <p>Joueurs inscrits</p>
+                    <div class="dashboard-card total-matches-card">
+                        <h3><i class="fas fa-trophy"></i> Nombre total de matchs</h3>
+                        <p id="total-matches">0</p>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-gamepad"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="total-matches">0</h3>
-                        <p>Matchs joués</p>
-                    </div>
+
+                <div class="recent-matches">
+                    <h2><i class="fas fa-history"></i> Matchs récents</h2>
+                    <ul id="recent-matches-list" class="recent-matches-list">
+                    </ul>
                 </div>
             </div>
 
-            <div class="recent-matches">
-                <h2><i class="fas fa-history"></i> Matchs récents</h2>
-                <div id="recent-matches-list" class="matches-list">
-                    <!-- Les matchs récents seront affichés ici -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Users Tab -->
-        <div id="users" class="tab-content">
-            <div class="section-header">
-                <h2><i class="fas fa-users"></i> Gestion des joueurs</h2>
+            <div id="users" class="tab-content">
                 <button class="btn btn-primary" id="add-user-btn">
-                    <i class="fas fa-plus"></i> Ajouter un joueur
+                    <i class="fas fa-user-plus"></i> Ajouter un joueur
                 </button>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Photo</th>
+                                <th>Nom</th>
+                                <th>Prénom</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-list">
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div id="users-list" class="users-grid">
-                <!-- Les utilisateurs seront affichés ici -->
-            </div>
-        </div>
-
-        <!-- Matches Tab -->
-        <div id="matches" class="tab-content">
-            <div class="section-header">
-                <h2><i class="fas fa-trophy"></i> Gestion des matchs</h2>
+            <div id="matches" class="tab-content">
                 <button class="btn btn-primary" id="add-match-btn">
-                    <i class="fas fa-plus"></i> Nouveau match
+                    <i class="fas fa-plus-circle"></i> Enregistrer un nouveau match
                 </button>
-            </div>
-
-            <div id="matches-list" class="matches-list">
-                <!-- Les matchs seront affichés ici -->
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Joueur 1</th>
+                                <th>Score J1</th>
+                                <th>Score J2</th>
+                                <th>Joueur 2</th>
+                                <th>Vainqueur</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matches-list">
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal pour ajouter/modifier un utilisateur -->
     <div id="user-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="user-modal-title"><i class="fas fa-user-plus"></i> Ajouter un joueur</h3>
-                <button class="close-btn" id="close-user-modal">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h3><i class="fas fa-user"></i> <span id="user-modal-title">Ajouter un joueur</span></h3>
+                <button class="close-btn" id="close-user-modal"><i class="fas fa-times"></i></button>
             </div>
-            <form id="user-form" enctype="multipart/form-data">
+            <form id="user-form">
+                <input type="hidden" id="user-id">
                 <div class="form-group">
                     <label for="user-name">Prénom *</label>
                     <input type="text" id="user-name" name="name" required>
@@ -111,28 +122,30 @@
                     <input type="text" id="user-surname" name="surname" required>
                 </div>
                 <div class="form-group">
+                    <label for="user-username">Nom d'utilisateur *</label>
+                    <input type="text" id="user-username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-password">Mot de passe * (Laisser vide pour ne pas changer)</label>
+                    <input type="password" id="user-password" name="password">
+                </div>
+                <div class="form-group">
                     <label for="user-photo">Photo de profil</label>
                     <input type="file" id="user-photo" name="photo" accept="image/*">
-                    <div id="photo-preview" class="photo-preview"></div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" id="cancel-user">Annuler</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Enregistrer
-                    </button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal pour ajouter un match -->
     <div id="match-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-gamepad"></i> Nouveau match</h3>
-                <button class="close-btn" id="close-match-modal">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h3><i class="fas fa-trophy"></i> Enregistrer un nouveau match</h3>
+                <button class="close-btn" id="close-match-modal"><i class="fas fa-times"></i></button>
             </div>
             <form id="match-form">
                 <div class="form-group">
@@ -168,12 +181,72 @@
         </div>
     </div>
 
-    <!-- Loading spinner -->
+    <div id="register-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> Inscription</h3>
+                <button class="close-btn" id="close-register-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="register-username">Nom d'utilisateur *</label>
+                    <input type="text" id="register-username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Mot de passe *</label>
+                    <input type="password" id="register-password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-name">Prénom *</label>
+                    <input type="text" id="register-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-surname">Nom *</label>
+                    <input type="text" id="register-surname" name="surname" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-register">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> S'inscrire
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-sign-in-alt"></i> Connexion</h3>
+                <button class="close-btn" id="close-login-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Nom d'utilisateur *</label>
+                    <input type="text" id="login-username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Mot de passe *</label>
+                    <input type="password" id="login-password" name="password" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-login">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Se connecter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="loading" class="loading">
         <div class="spinner"></div>
     </div>
 
-    <!-- Toast notifications -->
     <div id="toast-container" class="toast-container"></div>
 
     <script src="js/app.js"></script>
