@@ -17,6 +17,7 @@
                 <p>Suivez vos scores de ping-pong en temps réel</p>
             </div>
             <div class="auth-buttons">
+                <span id="logged-in-user-display" style="display: none; margin-right: 15px; font-weight: bold; color: #191970;"></span>
                 <button class="btn btn-primary" id="show-login-btn">
                     <i class="fas fa-sign-in-alt"></i> Se connecter
                 </button>
@@ -57,7 +58,7 @@
                 <div class="recent-matches">
                     <h2><i class="fas fa-history"></i> Matchs récents</h2>
                     <ul id="recent-matches-list" class="recent-matches-list">
-                    </ul>
+                        </ul>
                 </div>
             </div>
 
@@ -76,7 +77,7 @@
                             </tr>
                         </thead>
                         <tbody id="users-list">
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
@@ -98,7 +99,7 @@
                             </tr>
                         </thead>
                         <tbody id="matches-list">
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
@@ -150,9 +151,8 @@
             <form id="match-form">
                 <div class="form-group">
                     <label for="player1">Joueur 1 *</label>
-                    <select id="player1" name="player1_id" required>
-                        <option value="">Sélectionner un joueur</option>
-                    </select>
+                    <select id="player1" name="player1_id" required disabled>
+                        </select>
                 </div>
                 <div class="form-group">
                     <label for="player1-score">Score Joueur 1 *</label>
@@ -162,10 +162,10 @@
                     <span>VS</span>
                 </div>
                 <div class="form-group">
-                    <label for="player2">Joueur 2 *</label>
+                    <label for="player2">Joueur 2 * (Adversaire)</label>
                     <select id="player2" name="player2_id" required>
-                        <option value="">Sélectionner un joueur</option>
-                    </select>
+                        <option value="">Sélectionner un adversaire</option>
+                        </select>
                 </div>
                 <div class="form-group">
                     <label for="player2-score">Score Joueur 2 *</label>
