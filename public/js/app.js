@@ -35,6 +35,16 @@ const player1TeamMateSelect = document.getElementById('player1-team-mate');
 const player2MateGroup = document.getElementById('player2-mate-group');
 const player2TeamMateSelect = document.getElementById('player2-team-mate');
 
+// Dashboard personal stats elements
+const personalTotalMatches = document.getElementById('personal-total-matches');
+const personalWins = document.getElementById('personal-wins');
+const personalLosses = document.getElementById('personal-losses');
+const personalWinRate = document.getElementById('personal-win-rate');
+const strongestOpponentDisplay = document.getElementById('strongest-opponent');
+const strongestOpponentRecordDisplay = document.getElementById('strongest-opponent-record');
+const bestTeammateDisplay = document.getElementById('best-teammate');
+const bestTeammateMatchesDisplay = document.getElementById('best-teammate-matches');
+
 
 // Initialisation de l'application
 document.addEventListener('DOMContentLoaded', function() {
@@ -65,7 +75,7 @@ async function initializeApp() {
 
             await loadUsers();
             await loadMatches();
-            updateDashboard();
+            await updateDashboard(); // Call updateDashboard after loading all data
             populatePlayerSelectsForMatch(); // Call this after users are loaded
             showAppContent();
             switchTab('dashboard');
@@ -273,6 +283,16 @@ function logoutUser() {
     document.getElementById('recent-matches-list').innerHTML = '';
     document.getElementById('total-users').textContent = '0';
     document.getElementById('total-matches').textContent = '0';
+    personalTotalMatches.textContent = '0';
+    personalWins.textContent = '0';
+    personalLosses.textContent = '0';
+    personalWinRate.textContent = '0%';
+    strongestOpponentDisplay.textContent = 'N/A';
+    strongestOpponentRecordDisplay.textContent = '';
+    bestTeammateDisplay.textContent = 'N/A';
+    bestTeammateMatchesDisplay.textContent = '';
+
+
     if (loggedInUserDisplay) {
         loggedInUserDisplay.textContent = '';
     }
@@ -538,7 +558,7 @@ async function handleMatchSubmit(event) {
         }
 
         await loadMatches();
-        updateDashboard();
+        await updateDashboard(); // Update dashboard after new match is recorded
         closeMatchModal();
         showToast('Match enregistré avec succès!', 'success');
     } catch (error) {
@@ -558,6 +578,11 @@ function switchTab(tabId) {
     });
     document.getElementById(tabId).classList.add('active');
     document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+
+    // If switching to dashboard, ensure it's updated
+    if (tabId === 'dashboard' && loggedInUserId) {
+        updateDashboard();
+    }
 }
 
 function openUserModal(userId = null) {
@@ -662,21 +687,19 @@ function populatePlayerSelectsForMatch() {
     }
 
     // Populate Player 2 (opponent) - initially all other users
+    const defaultOption = document.createElement('option');
+    defaultOption.value = "";
+    defaultOption.textContent = "Sélectionner un adversaire";
+    player2Select.appendChild(defaultOption);
+
     const otherUsers = users.filter(user => user.id !== loggedInUserId);
-    if (otherUsers.length > 0) {
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.textContent = "Sélectionner un adversaire";
-        player2Select.appendChild(defaultOption);
-
-        otherUsers.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.id;
-            option.textContent = `${user.name} ${user.surname}`;
-            player2Select.appendChild(option);
-        });
-    }
-
+    otherUsers.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = `${user.name} ${user.surname}`;
+        player2Select.appendChild(option);
+    });
+    
     // Call updateTeamMateOptions after initial population
     updateTeamMateOptions();
 }
@@ -729,11 +752,100 @@ function updateTeamMateOptions() {
 }
 
 
-// NEW: Update Dashboard Function
-function updateDashboard() {
+// MODIFIED: Update Dashboard Function to include personal stats
+async function updateDashboard() {
     document.getElementById('total-users').textContent = users.length;
     document.getElementById('total-matches').textContent = matches.length;
+
+    if (loggedInUserId) {
+        showLoading();
+        try {
+            const response = await authenticatedFetch(`${API_BASE}/users/${loggedInUserId}/stats`);
+            const stats = await response.json();
+
+            // Display overall personal stats
+            personalTotalMatches.textContent = stats.overall_stats.total_matches;
+            personalWins.textContent = stats.overall_stats.wins;
+            personalLosses.textContent = stats.overall_stats.losses;
+            personalWinRate.textContent = `${stats.overall_stats.win_rate}%`;
+
+            // Calculate and display strongest opponent
+            const strongestOpponent = calculateStrongestOpponent(stats.opponent_stats);
+            if (strongestOpponent) {
+                strongestOpponentDisplay.textContent = `${strongestOpponent.opponent_name} ${strongestOpponent.opponent_surname}`;
+                strongestOpponentRecordDisplay.textContent = `(${strongestOpponent.wins_against} V - ${strongestOpponent.losses_against} D)`;
+            } else {
+                strongestOpponentDisplay.textContent = 'N/A';
+                strongestOpponentRecordDisplay.textContent = '';
+            }
+
+            // Calculate and display best teammate
+            const bestTeammate = calculateBestTeammate(stats.teammate_stats);
+            if (bestTeammate) {
+                bestTeammateDisplay.textContent = `${bestTeammate.teammate_name} ${bestTeammate.teammate_surname}`;
+                bestTeammateMatchesDisplay.textContent = `(${bestTeammate.matches_together} matchs ensemble)`;
+            } else {
+                bestTeammateDisplay.textContent = 'N/A';
+                bestTeammateMatchesDisplay.textContent = '';
+            }
+
+        } catch (error) {
+            console.error('Error loading personal stats:', error);
+            showToast('Erreur lors du chargement de vos statistiques personnelles.', 'error');
+            // Clear personal stats fields if there's an error
+            personalTotalMatches.textContent = '0';
+            personalWins.textContent = '0';
+            personalLosses.textContent = '0';
+            personalWinRate.textContent = '0%';
+            strongestOpponentDisplay.textContent = 'N/A';
+            strongestOpponentRecordDisplay.textContent = '';
+            bestTeammateDisplay.textContent = 'N/A';
+            bestTeammateMatchesDisplay.textContent = '';
+        } finally {
+            hideLoading();
+        }
+    }
 }
+
+// NEW: Helper function to find the strongest opponent
+function calculateStrongestOpponent(opponentStats) {
+    if (!opponentStats || opponentStats.length === 0) {
+        return null;
+    }
+
+    let strongest = null;
+    let highestLossRate = -1; // We want the opponent you lose to most often
+
+    opponentStats.forEach(opponent => {
+        if (opponent.total_games_against > 0) {
+            const lossRate = opponent.losses_against / opponent.total_games_against;
+            if (lossRate > highestLossRate) {
+                highestLossRate = lossRate;
+                strongest = opponent;
+            }
+        }
+    });
+    return strongest;
+}
+
+// NEW: Helper function to find the best teammate (most matches played together)
+function calculateBestTeammate(teammateStats) {
+    if (!teammateStats || teammateStats.length === 0) {
+        return null;
+    }
+
+    let best = null;
+    let maxMatches = -1;
+
+    teammateStats.forEach(teammate => {
+        if (teammate.matches_together > maxMatches) {
+            maxMatches = teammate.matches_together;
+            best = teammate;
+        }
+    });
+    return best;
+}
+
 
 // --- Utility Functions (Toast, Loading) ---
 function showLoading() {

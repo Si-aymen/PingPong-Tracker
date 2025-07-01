@@ -488,12 +488,13 @@ app.post('/api/matches', authenticateToken, async (req, res, next) => {
     }
 });
 
-// User statistics - MODIFIED for PostgreSQL syntax
+// User statistics - MODIFIED to provide more detailed stats for dashboard
 app.get('/api/users/:id/stats', authenticateToken, async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const query = `
+        // Overall stats
+        const overallStatsQuery = `
             SELECT
                 COUNT(*) as total_matches,
                 SUM(CASE WHEN winner_id = $1 THEN 1 ELSE 0 END) as wins,
@@ -501,25 +502,103 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res, next) => {
             FROM matches
             WHERE player1_id = $1 OR player2_id = $1 OR player1_team_mate_id = $1 OR player2_team_mate_id = $1;
         `;
+        const overallStatsResult = await pool.query(overallStatsQuery, [id]);
+        const overallStats = overallStatsResult.rows[0];
 
-        const result = await pool.query(query, [id]);
-        const stats = result.rows[0];
-
-        if (!stats) {
-            return res.status(404).json({ error: 'No matches found for this user' });
-        }
-
-        const totalMatches = parseInt(stats.total_matches);
-        const wins = parseInt(stats.wins);
-        const losses = parseInt(stats.losses);
-
+        const totalMatches = parseInt(overallStats.total_matches);
+        const wins = parseInt(overallStats.wins);
+        const losses = parseInt(overallStats.losses);
         const winRate = totalMatches > 0 ? (wins / totalMatches * 100).toFixed(1) : 0;
 
+        // Opponent stats (for 1v1 and 2v2)
+        const opponentStatsQuery = `
+            SELECT
+                CASE
+                    WHEN m.player1_id = $1 AND NOT m.is_2v2 THEN m.player2_id
+                    WHEN m.player2_id = $1 AND NOT m.is_2v2 THEN m.player1_id
+                    WHEN m.player1_id = $1 AND m.is_2v2 THEN m.player2_id
+                    WHEN m.player1_team_mate_id = $1 AND m.is_2v2 THEN m.player2_id
+                    WHEN m.player2_id = $1 AND m.is_2v2 THEN m.player1_id
+                    WHEN m.player2_team_mate_id = $1 AND m.is_2v2 THEN m.player1_id
+                    ELSE NULL
+                END AS opponent_id,
+                u.name AS opponent_name,
+                u.surname AS opponent_surname,
+                COUNT(*) AS total_games_against,
+                SUM(CASE WHEN m.winner_id = $1 THEN 1 ELSE 0 END) AS wins_against,
+                SUM(CASE WHEN m.winner_id != $1 THEN 1 ELSE 0 END) AS losses_against
+            FROM matches m
+            JOIN users u ON u.id = CASE
+                WHEN m.player1_id = $1 AND NOT m.is_2v2 THEN m.player2_id
+                WHEN m.player2_id = $1 AND NOT m.is_2v2 THEN m.player1_id
+                WHEN m.player1_id = $1 AND m.is_2v2 THEN m.player2_id
+                WHEN m.player1_team_mate_id = $1 AND m.is_2v2 THEN m.player2_id
+                WHEN m.player2_id = $1 AND m.is_2v2 THEN m.player1_id
+                WHEN m.player2_team_mate_id = $1 AND m.is_2v2 THEN m.player1_id
+                ELSE NULL
+            END
+            WHERE (m.player1_id = $1 OR m.player2_id = $1 OR m.player1_team_mate_id = $1 OR m.player2_team_mate_id = $1)
+            AND (
+                (NOT m.is_2v2 AND (m.player1_id = $1 OR m.player2_id = $1)) OR
+                (m.is_2v2 AND (m.player1_id = $1 OR m.player1_team_mate_id = $1 OR m.player2_id = $1 OR m.player2_team_mate_id = $1))
+            )
+            AND (
+                (NOT m.is_2v2 AND (m.player1_id = $1 OR m.player2_id = $1)) OR
+                (m.is_2v2 AND (m.player1_id != $1 AND m.player1_team_mate_id != $1 AND m.player2_id != $1 AND m.player2_team_mate_id != $1))
+            )
+            GROUP BY opponent_id, u.name, u.surname
+            HAVING opponent_id IS NOT NULL;
+        `;
+        const opponentStatsResult = await pool.query(opponentStatsQuery, [id]);
+        const opponentStats = opponentStatsResult.rows.map(row => ({
+            opponent_id: parseInt(row.opponent_id),
+            opponent_name: row.opponent_name,
+            opponent_surname: row.opponent_surname,
+            total_games_against: parseInt(row.total_games_against),
+            wins_against: parseInt(row.wins_against),
+            losses_against: parseInt(row.losses_against)
+        }));
+
+        // Teammate stats (only for 2v2 matches)
+        const teammateStatsQuery = `
+            SELECT
+                CASE
+                    WHEN m.player1_id = $1 THEN m.player1_team_mate_id
+                    WHEN m.player1_team_mate_id = $1 THEN m.player1_id
+                    ELSE NULL
+                END AS teammate_id,
+                u.name AS teammate_name,
+                u.surname AS teammate_surname,
+                COUNT(*) AS matches_together
+            FROM matches m
+            JOIN users u ON u.id = CASE
+                WHEN m.player1_id = $1 THEN m.player1_team_mate_id
+                WHEN m.player1_team_mate_id = $1 THEN m.player1_id
+                ELSE NULL
+            END
+            WHERE m.is_2v2 = TRUE
+            AND (m.player1_id = $1 OR m.player1_team_mate_id = $1)
+            GROUP BY teammate_id, u.name, u.surname
+            HAVING teammate_id IS NOT NULL;
+        `;
+        const teammateStatsResult = await pool.query(teammateStatsQuery, [id]);
+        const teammateStats = teammateStatsResult.rows.map(row => ({
+            teammate_id: parseInt(row.teammate_id),
+            teammate_name: row.teammate_name,
+            teammate_surname: row.teammate_surname,
+            matches_together: parseInt(row.matches_together)
+        }));
+
+
         res.json({
-            total_matches: totalMatches, 
-            wins: wins,
-            losses: losses,
-            win_rate: parseFloat(winRate)
+            overall_stats: {
+                total_matches: totalMatches, 
+                wins: wins,
+                losses: losses,
+                win_rate: parseFloat(winRate)
+            },
+            opponent_stats: opponentStats,
+            teammate_stats: teammateStats
         });
     } catch (err) {
         next(err);
