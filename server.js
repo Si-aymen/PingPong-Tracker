@@ -510,44 +510,73 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res, next) => {
         const losses = parseInt(overallStats.losses);
         const winRate = totalMatches > 0 ? (wins / totalMatches * 100).toFixed(1) : 0;
 
-        // Opponent stats (for 1v1 and 2v2)
+        // Opponent stats (Revised for robustness and clarity using UNION ALL)
         const opponentStatsQuery = `
+            WITH UserOpponents AS (
+                -- 1v1 matches where current user is player1
+                SELECT
+                    m.player2_id AS opponent_id,
+                    (m.winner_id = $1) AS is_win
+                FROM matches m
+                WHERE m.player1_id = $1 AND m.is_2v2 = FALSE
+
+                UNION ALL
+
+                -- 1v1 matches where current user is player2
+                SELECT
+                    m.player1_id AS opponent_id,
+                    (m.winner_id = $1) AS is_win
+                FROM matches m
+                WHERE m.player2_id = $1 AND m.is_2v2 = FALSE
+
+                UNION ALL
+
+                -- 2v2 matches where current user is on team1 (player1 or player1_team_mate)
+                -- Opponents are player2 and player2_team_mate
+                SELECT
+                    m.player2_id AS opponent_id,
+                    (m.winner_id = $1) AS is_win
+                FROM matches m
+                WHERE (m.player1_id = $1 OR m.player1_team_mate_id = $1) AND m.is_2v2 = TRUE
+
+                UNION ALL
+
+                SELECT
+                    m.player2_team_mate_id AS opponent_id,
+                    (m.winner_id = $1) AS is_win
+                FROM matches m
+                WHERE (m.player1_id = $1 OR m.player1_team_mate_id = $1) AND m.is_2v2 = TRUE
+                AND m.player2_team_mate_id IS NOT NULL -- Ensure teammate exists
+
+                UNION ALL
+
+                -- 2v2 matches where current user is on team2 (player2 or player2_team_mate)
+                -- Opponents are player1 and player1_team_mate
+                SELECT
+                    m.player1_id AS opponent_id,
+                    (m.winner_id = $1) AS is_win
+                FROM matches m
+                WHERE (m.player2_id = $1 OR m.player2_team_mate_id = $1) AND m.is_2v2 = TRUE
+
+                UNION ALL
+
+                SELECT
+                    m.player1_team_mate_id AS opponent_id,
+                    (m.winner_id = $1) AS is_win
+                FROM matches m
+                WHERE (m.player2_id = $1 OR m.player2_team_mate_id = $1) AND m.is_2v2 = TRUE
+                AND m.player1_team_mate_id IS NOT NULL -- Ensure teammate exists
+            )
             SELECT
-                CASE
-                    WHEN m.player1_id = $1 AND NOT m.is_2v2 THEN m.player2_id
-                    WHEN m.player2_id = $1 AND NOT m.is_2v2 THEN m.player1_id
-                    WHEN m.player1_id = $1 AND m.is_2v2 THEN m.player2_id
-                    WHEN m.player1_team_mate_id = $1 AND m.is_2v2 THEN m.player2_id
-                    WHEN m.player2_id = $1 AND m.is_2v2 THEN m.player1_id
-                    WHEN m.player2_team_mate_id = $1 AND m.is_2v2 THEN m.player1_id
-                    ELSE NULL
-                END AS opponent_id,
+                uo.opponent_id,
                 u.name AS opponent_name,
                 u.surname AS opponent_surname,
                 COUNT(*) AS total_games_against,
-                SUM(CASE WHEN m.winner_id = $1 THEN 1 ELSE 0 END) AS wins_against,
-                SUM(CASE WHEN m.winner_id != $1 THEN 1 ELSE 0 END) AS losses_against
-            FROM matches m
-            JOIN users u ON u.id = CASE
-                WHEN m.player1_id = $1 AND NOT m.is_2v2 THEN m.player2_id
-                WHEN m.player2_id = $1 AND NOT m.is_2v2 THEN m.player1_id
-                WHEN m.player1_id = $1 AND m.is_2v2 THEN m.player2_id
-                WHEN m.player1_team_mate_id = $1 AND m.is_2v2 THEN m.player2_id
-                WHEN m.player2_id = $1 AND m.is_2v2 THEN m.player1_id
-                WHEN m.player2_team_mate_id = $1 AND m.is_2v2 THEN m.player1_id
-                ELSE NULL
-            END
-            WHERE (m.player1_id = $1 OR m.player2_id = $1 OR m.player1_team_mate_id = $1 OR m.player2_team_mate_id = $1)
-            AND (
-                (NOT m.is_2v2 AND (m.player1_id = $1 OR m.player2_id = $1)) OR
-                (m.is_2v2 AND (m.player1_id = $1 OR m.player1_team_mate_id = $1 OR m.player2_id = $1 OR m.player2_team_mate_id = $1))
-            )
-            AND (
-                (NOT m.is_2v2 AND (m.player1_id = $1 OR m.player2_id = $1)) OR
-                (m.is_2v2 AND (m.player1_id != $1 AND m.player1_team_mate_id != $1 AND m.player2_id != $1 AND m.player2_team_mate_id != $1))
-            )
-            GROUP BY opponent_id, u.name, u.surname
-            HAVING opponent_id IS NOT NULL;
+                SUM(CASE WHEN uo.is_win THEN 1 ELSE 0 END) AS wins_against,
+                SUM(CASE WHEN NOT uo.is_win THEN 1 ELSE 0 END) AS losses_against
+            FROM UserOpponents uo
+            JOIN users u ON u.id = uo.opponent_id
+            GROUP BY uo.opponent_id, u.name, u.surname;
         `;
         const opponentStatsResult = await pool.query(opponentStatsQuery, [id]);
         const opponentStats = opponentStatsResult.rows.map(row => ({
@@ -559,27 +588,47 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res, next) => {
             losses_against: parseInt(row.losses_against)
         }));
 
-        // Teammate stats (only for 2v2 matches)
+        // Teammate stats (Revised for robustness and clarity using UNION ALL)
         const teammateStatsQuery = `
+            WITH UserTeammates AS (
+                -- User is player1, teammate is player1_team_mate_id
+                SELECT
+                    m.player1_team_mate_id AS teammate_id
+                FROM matches m
+                WHERE m.player1_id = $1 AND m.is_2v2 = TRUE AND m.player1_team_mate_id IS NOT NULL
+
+                UNION ALL
+
+                -- User is player1_team_mate_id, teammate is player1_id
+                SELECT
+                    m.player1_id AS teammate_id
+                FROM matches m
+                WHERE m.player1_team_mate_id = $1 AND m.is_2v2 = TRUE
+
+                UNION ALL
+
+                -- User is player2, teammate is player2_team_mate_id
+                SELECT
+                    m.player2_team_mate_id AS teammate_id
+                FROM matches m
+                WHERE m.player2_id = $1 AND m.is_2v2 = TRUE AND m.player2_team_mate_id IS NOT NULL
+
+                UNION ALL
+
+                -- User is player2_team_mate_id, teammate is player2_id
+                SELECT
+                    m.player2_id AS teammate_id
+                FROM matches m
+                WHERE m.player2_team_mate_id = $1 AND m.is_2v2 = TRUE
+            )
             SELECT
-                CASE
-                    WHEN m.player1_id = $1 THEN m.player1_team_mate_id
-                    WHEN m.player1_team_mate_id = $1 THEN m.player1_id
-                    ELSE NULL
-                END AS teammate_id,
+                ut.teammate_id,
                 u.name AS teammate_name,
                 u.surname AS teammate_surname,
                 COUNT(*) AS matches_together
-            FROM matches m
-            JOIN users u ON u.id = CASE
-                WHEN m.player1_id = $1 THEN m.player1_team_mate_id
-                WHEN m.player1_team_mate_id = $1 THEN m.player1_id
-                ELSE NULL
-            END
-            WHERE m.is_2v2 = TRUE
-            AND (m.player1_id = $1 OR m.player1_team_mate_id = $1)
-            GROUP BY teammate_id, u.name, u.surname
-            HAVING teammate_id IS NOT NULL;
+            FROM UserTeammates ut
+            JOIN users u ON u.id = ut.teammate_id
+            GROUP BY ut.teammate_id, u.name, u.surname;
         `;
         const teammateStatsResult = await pool.query(teammateStatsQuery, [id]);
         const teammateStats = teammateStatsResult.rows.map(row => ({
