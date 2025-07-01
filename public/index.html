@@ -58,7 +58,7 @@
                 <div class="recent-matches">
                     <h2><i class="fas fa-history"></i> Matchs récents</h2>
                     <ul id="recent-matches-list" class="recent-matches-list">
-                        </ul>
+                    </ul>
                 </div>
             </div>
 
@@ -77,7 +77,7 @@
                             </tr>
                         </thead>
                         <tbody id="users-list">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -99,7 +99,7 @@
                             </tr>
                         </thead>
                         <tbody id="matches-list">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -149,23 +149,50 @@
                 <button class="close-btn" id="close-match-modal"><i class="fas fa-times"></i></button>
             </div>
             <form id="match-form">
+                <!-- Match Type Selection -->
+                <div class="form-group">
+                    <label>Type de match *</label>
+                    <div class="match-type-radio">
+                        <label><input type="radio" name="match_type" value="1v1" checked> 1 vs 1</label>
+                        <label><input type="radio" name="match_type" value="2v2"> 2 vs 2</label>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="player1">Joueur 1 *</label>
                     <select id="player1" name="player1_id" required disabled>
-                        </select>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+                <div id="player1-mate-group" class="form-group" style="display: none;">
+                    <label for="player1-team-mate">Coéquipier Joueur 1 *</label>
+                    <select id="player1-team-mate" name="player1_team_mate_id">
+                        <option value="">Sélectionner un coéquipier</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="player1-score">Score Joueur 1 *</label>
                     <input type="number" id="player1-score" name="player1_score" min="0" required>
                 </div>
+
                 <div class="vs-divider">
                     <span>VS</span>
                 </div>
+
                 <div class="form-group">
                     <label for="player2">Joueur 2 * (Adversaire)</label>
                     <select id="player2" name="player2_id" required>
                         <option value="">Sélectionner un adversaire</option>
-                        </select>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+                <div id="player2-mate-group" class="form-group" style="display: none;">
+                    <label for="player2-team-mate">Coéquipier Joueur 2 *</label>
+                    <select id="player2-team-mate" name="player2_team_mate_id">
+                        <option value="">Sélectionner un coéquipier</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="player2-score">Score Joueur 2 *</label>

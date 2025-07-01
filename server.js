@@ -73,6 +73,7 @@ const existsAsync = util.promisify(fs.exists);
 // PostgreSQL Database Schema Initialization
 async function initializeDatabaseSchema() {
     try {
+        // Create users table if it doesn't exist
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -84,6 +85,28 @@ async function initializeDatabaseSchema() {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // Add new columns to matches table if they don't exist (for existing databases)
+        // Using DO $$ BEGIN ... END $$; for conditional DDL
+        await pool.query(`
+            DO $$
+            BEGIN
+                ALTER TABLE matches ADD COLUMN IF NOT EXISTS player1_team_mate_id INTEGER;
+                ALTER TABLE matches ADD COLUMN IF NOT EXISTS player2_team_mate_id INTEGER;
+                ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_2v2 BOOLEAN DEFAULT FALSE;
+
+                -- Add foreign keys after columns are ensured to exist
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'matches_player1_team_mate_id_fkey') THEN
+                    ALTER TABLE matches ADD CONSTRAINT matches_player1_team_mate_id_fkey FOREIGN KEY (player1_team_mate_id) REFERENCES users(id) ON DELETE CASCADE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'matches_player2_team_mate_id_fkey') THEN
+                    ALTER TABLE matches ADD CONSTRAINT matches_player2_team_mate_id_fkey FOREIGN KEY (player2_team_mate_id) REFERENCES users(id) ON DELETE CASCADE;
+                END IF;
+            END
+            $$;
+        `);
+
+        // Create matches table if it doesn't exist (includes new columns for fresh installs)
         await pool.query(`
             CREATE TABLE IF NOT EXISTS matches (
                 id SERIAL PRIMARY KEY,
@@ -93,14 +116,19 @@ async function initializeDatabaseSchema() {
                 player2_score INTEGER NOT NULL,
                 winner_id INTEGER NOT NULL,
                 match_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                is_2v2 BOOLEAN DEFAULT FALSE, -- New column
+                player1_team_mate_id INTEGER, -- New column
+                player2_team_mate_id INTEGER, -- New column
                 FOREIGN KEY (player1_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (player2_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (player1_team_mate_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (player2_team_mate_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (winner_id) REFERENCES users(id) ON DELETE CASCADE
             );
         `);
-        console.log('PostgreSQL tables created or already exist.');
+        console.log('PostgreSQL tables created or updated.');
     } catch (dbErr) {
-        console.error('Error creating PostgreSQL tables:', dbErr.message);
+        console.error('Error creating/updating PostgreSQL tables:', dbErr.message);
         // This is a critical error, you might want to exit or handle it differently
     }
 }
@@ -362,11 +390,20 @@ app.get('/api/matches', authenticateToken, async (req, res, next) => {
                 m.winner_id,
                 w.name AS winner_name,
                 w.surname AS winner_surname,
-                m.match_date
+                m.match_date,
+                m.is_2v2, -- Include new column
+                m.player1_team_mate_id, -- Include new column
+                p1tm.name AS player1_team_mate_name, -- Join for teammate name
+                p1tm.surname AS player1_team_mate_surname, -- Join for teammate surname
+                m.player2_team_mate_id, -- Include new column
+                p2tm.name AS player2_team_mate_name, -- Join for teammate name
+                p2tm.surname AS player2_team_mate_surname -- Join for teammate surname
             FROM matches m
             JOIN users p1 ON m.player1_id = p1.id
             JOIN users p2 ON m.player2_id = p2.id
             JOIN users w ON m.winner_id = w.id
+            LEFT JOIN users p1tm ON m.player1_team_mate_id = p1tm.id -- LEFT JOIN for optional teammates
+            LEFT JOIN users p2tm ON m.player2_team_mate_id = p2tm.id -- LEFT JOIN for optional teammates
             ORDER BY m.match_date DESC;
         `);
         res.json(result.rows);
@@ -378,29 +415,59 @@ app.get('/api/matches', authenticateToken, async (req, res, next) => {
 
 app.post('/api/matches', authenticateToken, async (req, res, next) => {
     try {
-        const { player1_id, player2_id, player1_score, player2_score } = req.body;
+        const { 
+            player1_id, 
+            player2_id, 
+            player1_score, 
+            player2_score,
+            player1_team_mate_id, // New
+            player2_team_mate_id, // New
+            is_2v2 // New
+        } = req.body;
 
+        // Basic validation for essential fields
         if (!player1_id || !player2_id || player1_score === undefined || player2_score === undefined) {
-            return res.status(400).json({ error: 'All match details are required.' });
+            return res.status(400).json({ error: 'All essential match details are required.' });
         }
 
-        if (player1_id === player2_id) {
-            return res.status(400).json({ error: 'Player 1 and Player 2 cannot be the same.' });
+        // Validate 2v2 specific fields
+        if (is_2v2 && (!player1_team_mate_id || !player2_team_mate_id)) {
+            return res.status(400).json({ error: 'For 2v2 matches, both team mates are required.' });
+        }
+        
+        // Frontend validation: Players in the same team shouldn't be the same person
+        if (is_2v2 && (player1_id === player1_team_mate_id || player2_id === player2_team_mate_id)) {
+            return res.status(400).json({ error: 'A player cannot be their own teammate.' });
+        }
+        
+        // Ensure no player is listed multiple times across teams (in 2v2)
+        if (is_2v2) {
+            const allPlayerIds = [player1_id, player1_team_mate_id, player2_id, player2_team_mate_id];
+            const uniquePlayerIds = new Set(allPlayerIds);
+            if (uniquePlayerIds.size !== 4) { // Expect 4 unique players for 2v2
+                return res.status(400).json({ error: 'The same player cannot be on multiple teams in a 2v2 match.' });
+            }
+        } else {
+            // For 1v1, ensure player1 and player2 are different
+            if (player1_id === player2_id) {
+                return res.status(400).json({ error: 'Player 1 and Player 2 cannot be the same in a 1v1 match.' });
+            }
         }
 
-        // Determine winner
+
+        // Determine winner (winner_id will be one of the players from the winning team)
         let winner_id;
         if (player1_score > player2_score) {
-            winner_id = player1_id;
+            winner_id = player1_id; 
         } else if (player2_score > player1_score) {
-            winner_id = player2_id;
+            winner_id = player2_id; 
         } else {
             return res.status(400).json({ error: 'Match cannot be a draw. Please ensure a winner.' });
         }
 
         const result = await pool.query(
-            'INSERT INTO matches (player1_id, player2_id, player1_score, player2_score, winner_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-            [player1_id, player2_id, player1_score, player2_score, winner_id]
+            'INSERT INTO matches (player1_id, player2_id, player1_score, player2_score, winner_id, player1_team_mate_id, player2_team_mate_id, is_2v2) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+            [player1_id, player2_id, player1_score, player2_score, winner_id, is_2v2 ? player1_team_mate_id : null, is_2v2 ? player2_team_mate_id : null, is_2v2]
         );
 
         res.status(201).json({
@@ -410,6 +477,9 @@ app.post('/api/matches', authenticateToken, async (req, res, next) => {
             player1_score,
             player2_score,
             winner_id,
+            player1_team_mate_id: is_2v2 ? player1_team_mate_id : null,
+            player2_team_mate_id: is_2v2 ? player2_team_mate_id : null,
+            is_2v2,
             message: 'Match recorded successfully.'
         });
     } catch (err) {
@@ -427,9 +497,9 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res, next) => {
             SELECT
                 COUNT(*) as total_matches,
                 SUM(CASE WHEN winner_id = $1 THEN 1 ELSE 0 END) as wins,
-                SUM(CASE WHEN winner_id != $1 THEN 1 ELSE 0 END) as losses
+                SUM(CASE WHEN (player1_id = $1 OR player1_team_mate_id = $1 OR player2_id = $1 OR player2_team_mate_id = $1) AND winner_id != $1 THEN 1 ELSE 0 END) as losses
             FROM matches
-            WHERE player1_id = $1 OR player2_id = $1;
+            WHERE player1_id = $1 OR player2_id = $1 OR player1_team_mate_id = $1 OR player2_team_mate_id = $1;
         `;
 
         const result = await pool.query(query, [id]);
@@ -439,12 +509,16 @@ app.get('/api/users/:id/stats', authenticateToken, async (req, res, next) => {
             return res.status(404).json({ error: 'No matches found for this user' });
         }
 
-        const winRate = stats.total_matches > 0 ? (stats.wins / stats.total_matches * 100).toFixed(1) : 0;
+        const totalMatches = parseInt(stats.total_matches);
+        const wins = parseInt(stats.wins);
+        const losses = parseInt(stats.losses);
+
+        const winRate = totalMatches > 0 ? (wins / totalMatches * 100).toFixed(1) : 0;
 
         res.json({
-            total_matches: parseInt(stats.total_matches), // Ensure these are numbers
-            wins: parseInt(stats.wins),
-            losses: parseInt(stats.losses),
+            total_matches: totalMatches, 
+            wins: wins,
+            losses: losses,
             win_rate: parseFloat(winRate)
         });
     } catch (err) {

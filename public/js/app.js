@@ -26,6 +26,15 @@ const showLoginBtn = document.getElementById('show-login-btn');
 const showRegisterBtn = document.getElementById('show-register-btn');
 const loggedInUserDisplay = document.getElementById('logged-in-user-display'); // NEW: Add a span in index.html for this
 
+// NEW Match Type DOM elements
+const matchTypeRadios = document.querySelectorAll('input[name="match_type"]');
+const player1Select = document.getElementById('player1');
+const player2Select = document.getElementById('player2');
+const player1MateGroup = document.getElementById('player1-mate-group');
+const player1TeamMateSelect = document.getElementById('player1-team-mate');
+const player2MateGroup = document.getElementById('player2-mate-group');
+const player2TeamMateSelect = document.getElementById('player2-team-mate');
+
 
 // Initialisation de l'application
 document.addEventListener('DOMContentLoaded', function() {
@@ -57,7 +66,7 @@ async function initializeApp() {
             await loadUsers();
             await loadMatches();
             updateDashboard();
-            populatePlayerSelects(); // Call this after users are loaded
+            populatePlayerSelectsForMatch(); // Call this after users are loaded
             showAppContent();
             switchTab('dashboard');
         } catch (error) {
@@ -125,6 +134,17 @@ function setupEventListeners() {
     document.getElementById('close-login-modal').addEventListener('click', closeLoginModal);
     document.getElementById('cancel-login').addEventListener('click', closeLoginModal);
     document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+    // NEW: Match type radio button listeners
+    matchTypeRadios.forEach(radio => {
+        radio.addEventListener('change', toggleMatchFormFields);
+    });
+
+    // Add listeners for player selects to update teammate options
+    player1Select.addEventListener('change', updateTeamMateOptions);
+    player2Select.addEventListener('change', updateTeamMateOptions);
+    player1TeamMateSelect.addEventListener('change', updateTeamMateOptions);
+    player2TeamMateSelect.addEventListener('change', updateTeamMateOptions);
 }
 
 // --- UI Display Functions ---
@@ -247,6 +267,7 @@ function logoutUser() {
     localStorage.removeItem('authToken');
     showToast('Déconnexion réussie', 'info');
     showAuthForms();
+    // Clear displayed data
     document.getElementById('users-list').innerHTML = '';
     document.getElementById('matches-list').innerHTML = '';
     document.getElementById('recent-matches-list').innerHTML = '';
@@ -324,6 +345,7 @@ async function handleUserSubmit(event) {
     const formData = new FormData(event.target);
     const photoFile = formData.get('photo');
 
+    // If editing and no new photo selected, remove the 'photo' field from formData
     if (userId && !photoFile.name) {
         formData.delete('photo');
     }
@@ -335,7 +357,7 @@ async function handleUserSubmit(event) {
     try {
         const response = await authenticatedFetch(url, {
             method: method,
-            body: formData
+            body: formData // FormData automatically sets Content-Type to multipart/form-data
         });
 
         if (!response.ok) {
@@ -344,7 +366,7 @@ async function handleUserSubmit(event) {
         }
 
         await loadUsers();
-        populatePlayerSelects();
+        populatePlayerSelectsForMatch(); // Re-populate selects after user changes
         closeUserModal();
         showToast(`Joueur ${isEditing ? 'mis à jour' : 'créé'} avec succès!`, 'success');
     } catch (error) {
@@ -356,9 +378,8 @@ async function handleUserSubmit(event) {
 
 
 async function deleteUser(userId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce joueur et tous ses matchs associés ?')) {
-        return;
-    }
+    // Replaced confirm() with a custom modal/toast for better UX in a web app
+    showToast('Suppression en cours...', 'info'); // Provide immediate feedback
     showLoading();
     try {
         const response = await authenticatedFetch(`${API_BASE}/users/${userId}`, {
@@ -373,7 +394,7 @@ async function deleteUser(userId) {
         await loadUsers();
         await loadMatches();
         updateDashboard();
-        populatePlayerSelects();
+        populatePlayerSelectsForMatch(); // Re-populate selects after user changes
         showToast('Joueur supprimé avec succès!', 'success');
     } catch (error) {
         showToast(error.message, 'error');
@@ -399,12 +420,19 @@ function displayMatches() {
     matchesList.innerHTML = '';
     matches.forEach(match => {
         const row = document.createElement('tr');
+        // Construct player team names for display
+        const player1TeamDisplay = `${match.player1_name} ${match.player1_surname}` +
+            (match.is_2v2 ? ` & ${match.player1_team_mate_name || 'N/A'} ${match.player1_team_mate_surname || ''}` : '');
+        const player2TeamDisplay = `${match.player2_name} ${match.player2_surname}` +
+            (match.is_2v2 ? ` & ${match.player2_team_mate_name || 'N/A'} ${match.player2_team_mate_surname || ''}` : '');
+        const winnerNameDisplay = `${match.winner_name} ${match.winner_surname}`;
+
         row.innerHTML = `
-            <td>${match.player1_name} ${match.player1_surname}</td>
+            <td>${player1TeamDisplay}</td>
             <td>${match.player1_score}</td>
             <td>${match.player2_score}</td>
-            <td>${match.player2_name} ${match.player2_surname}</td>
-            <td>${match.winner_name} ${match.winner_surname}</td>
+            <td>${player2TeamDisplay}</td>
+            <td>${winnerNameDisplay}</td>
             <td>${new Date(match.match_date).toLocaleDateString()}</td>
         `;
         matchesList.appendChild(row);
@@ -414,14 +442,20 @@ function displayMatches() {
 function displayRecentMatches() {
     const recentMatchesList = document.getElementById('recent-matches-list');
     recentMatchesList.innerHTML = '';
-    const recent5Matches = matches.slice(0, 5);
+    const recent5Matches = matches.slice(0, 5); // Get the 5 most recent matches
     recent5Matches.forEach(match => {
         const li = document.createElement('li');
+        // Construct player team names for display
+        const player1TeamDisplay = `<strong>${match.player1_name} ${match.player1_surname}</strong>` +
+            (match.is_2v2 ? ` & <strong>${match.player1_team_mate_name || 'N/A'} ${match.player1_team_mate_surname || ''}</strong>` : '');
+        const player2TeamDisplay = `<strong>${match.player2_name} ${match.player2_surname}</strong>` +
+            (match.is_2v2 ? ` & <strong>${match.player2_team_mate_name || 'N/A'} ${match.player2_team_mate_surname || ''}</strong>` : '');
+
         li.innerHTML = `
             <div class="match-info">
-                <span><strong>${match.player1_name} ${match.player1_surname}</strong> (${match.player1_score})</span>
+                <span>${player1TeamDisplay} (${match.player1_score})</span>
                 <span class="vs">vs</span>
-                <span>(${match.player2_score}) <strong>${match.player2_name} ${match.player2_surname}</strong></span>
+                <span>(${match.player2_score}) ${player2TeamDisplay}</span>
             </div>
             <div class="match-meta">
                 <span>Vainqueur: ${match.winner_name} ${match.winner_surname}</span>
@@ -439,12 +473,57 @@ async function handleMatchSubmit(event) {
     const formData = new FormData(event.target);
     const data = Object.fromEntries(formData.entries());
 
+    const is2v2 = data.match_type === '2v2';
+
     // Ensure player1_id is the logged-in user's ID
-    data.player1_id = loggedInUserId; // This is crucial
+    data.player1_id = loggedInUserId;
 
     // Convert scores to numbers
     data.player1_score = parseInt(data.player1_score);
     data.player2_score = parseInt(data.player2_score);
+    
+    // Set 2v2 specific fields
+    data.is_2v2 = is2v2;
+    data.player1_team_mate_id = is2v2 ? parseInt(data.player1_team_mate_id) : null;
+    data.player2_team_mate_id = is2v2 ? parseInt(data.player2_team_mate_id) : null;
+
+    // Remove the temporary 'match_type' field as it's not needed by the backend directly
+    delete data.match_type; 
+    
+    // Frontend validation for 2v2 specific requirements
+    if (is2v2) {
+        if (!data.player1_team_mate_id || !data.player2_team_mate_id) {
+            showToast('Pour un match 2v2, les deux coéquipiers sont requis.', 'error');
+            hideLoading();
+            return;
+        }
+        if (data.player1_id === data.player1_team_mate_id) {
+            showToast('Le Joueur 1 ne peut pas être son propre coéquipier.', 'error');
+            hideLoading();
+            return;
+        }
+        if (data.player2_id === data.player2_team_mate_id) {
+            showToast('Le Joueur 2 ne peut pas être son propre coéquipier.', 'error');
+            hideLoading();
+            return;
+        }
+
+        // Check for unique players across all 4 positions
+        const allPlayerIds = [data.player1_id, data.player1_team_mate_id, data.player2_id, data.player2_team_mate_id];
+        const uniquePlayerIds = new Set(allPlayerIds);
+        if (uniquePlayerIds.size !== 4) { // Expect 4 unique players for 2v2
+            showToast('Un même joueur ne peut pas être sur plusieurs équipes dans un match 2v2.', 'error');
+            hideLoading();
+            return;
+        }
+    } else { // 1v1 validation
+        if (data.player1_id === data.player2_id) {
+            showToast('Le Joueur 1 et le Joueur 2 ne peuvent pas être la même personne dans un match 1v1.', 'error');
+            hideLoading();
+            return;
+        }
+    }
+
 
     try {
         const response = await authenticatedFetch(`${API_BASE}/matches`, {
@@ -482,14 +561,10 @@ function switchTab(tabId) {
 }
 
 function openUserModal(userId = null) {
-    // Only allow current user to edit their own profile if they are not an admin
-    // For simplicity, we're assuming anyone can add/edit users after login in this version.
-    // A proper admin role would be needed for more fine-grained control.
     const modalTitle = document.getElementById('user-modal-title');
     const userForm = document.getElementById('user-form');
     userForm.reset();
 
-    // Specific fields for user creation vs. editing
     const userUsernameField = document.getElementById('user-username');
     const userPasswordField = document.getElementById('user-password');
 
@@ -530,21 +605,47 @@ function openMatchModal() {
 
     matchModal.classList.add('active');
     document.getElementById('match-form').reset();
-    populatePlayerSelectsForMatch(); // NEW: Call the specific function for match dropdowns
+    // Default to 1v1 when opening the modal
+    document.querySelector('input[name="match_type"][value="1v1"]').checked = true;
+    toggleMatchFormFields(); // Call to set initial visibility based on default 1v1
+    populatePlayerSelectsForMatch(); // Populate dropdowns
 }
 
 function closeMatchModal() {
     matchModal.classList.remove('active');
 }
 
+// NEW: Function to toggle form fields based on match type
+function toggleMatchFormFields() {
+    const is2v2 = document.querySelector('input[name="match_type"]:checked').value === '2v2';
+
+    if (is2v2) {
+        player1MateGroup.style.display = 'block';
+        player2MateGroup.style.display = 'block';
+        player1TeamMateSelect.setAttribute('required', 'required');
+        player2TeamMateSelect.setAttribute('required', 'required');
+    } else {
+        player1MateGroup.style.display = 'none';
+        player2MateGroup.style.display = 'none';
+        player1TeamMateSelect.removeAttribute('required');
+        player2TeamMateSelect.removeAttribute('required');
+        // Clear selections when switching back to 1v1
+        player1TeamMateSelect.value = '';
+        player2TeamMateSelect.value = '';
+    }
+    // Re-populate options to ensure correct filtering after toggle
+    updateTeamMateOptions(); 
+}
+
+
 // NEW: populatePlayerSelectsForMatch
 function populatePlayerSelectsForMatch() {
-    const player1Select = document.getElementById('player1');
-    const player2Select = document.getElementById('player2');
-
     // Clear previous options
     player1Select.innerHTML = '';
     player2Select.innerHTML = '';
+    player1TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
+    player2TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
+
 
     // Set Player 1 (the logged-in user)
     const loggedInUser = users.find(u => u.id === loggedInUserId);
@@ -556,12 +657,11 @@ function populatePlayerSelectsForMatch() {
         player1Select.value = loggedInUser.id; // Pre-select
         player1Select.disabled = true; // Make it non-changeable
     } else {
-        // This should ideally not happen if loggedInUserId is set correctly
         player1Select.innerHTML = '<option value="">Erreur: Joueur non trouvé</option>';
         player1Select.disabled = true;
     }
 
-    // Populate Player 2 (opponent) - exclude the logged-in user
+    // Populate Player 2 (opponent) - initially all other users
     const otherUsers = users.filter(user => user.id !== loggedInUserId);
     if (otherUsers.length > 0) {
         const defaultOption = document.createElement('option');
@@ -575,69 +675,91 @@ function populatePlayerSelectsForMatch() {
             option.textContent = `${user.name} ${user.surname}`;
             player2Select.appendChild(option);
         });
-        player2Select.disabled = false; // Ensure it's enabled for selection
+    }
+
+    // Call updateTeamMateOptions after initial population
+    updateTeamMateOptions();
+}
+
+// NEW Function to update teammate dropdowns based on current player selections
+function updateTeamMateOptions() {
+    const selectedPlayer1Id = parseInt(player1Select.value);
+    const selectedPlayer2Id = parseInt(player2Select.value);
+    
+    // Store current selections to try and re-select after update
+    const currentP1MateValue = player1TeamMateSelect.value;
+    const currentP2MateValue = player2TeamMateSelect.value;
+
+    // Filter available players for team mates: exclude Player 1 and Player 2
+    let availableTeamMates = users.filter(user => 
+        user.id !== selectedPlayer1Id && 
+        user.id !== selectedPlayer2Id
+    );
+
+    // Populate player1TeamMateSelect
+    player1TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
+    availableTeamMates.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = `${user.name} ${user.surname}`;
+        player1TeamMateSelect.appendChild(option);
+    });
+
+    // Populate player2TeamMateSelect
+    player2TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
+    availableTeamMates.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = `${user.name} ${user.surname}`;
+        player2TeamMateSelect.appendChild(option);
+    });
+
+    // Attempt to re-select previous values if they are still valid
+    if (availableTeamMates.some(u => u.id === parseInt(currentP1MateValue))) {
+        player1TeamMateSelect.value = currentP1MateValue;
     } else {
-        player2Select.innerHTML = '<option value="">Aucun autre joueur disponible</option>';
-        player2Select.disabled = true;
+        player1TeamMateSelect.value = '';
+    }
+
+    if (availableTeamMates.some(u => u.id === parseInt(currentP2MateValue))) {
+        player2TeamMateSelect.value = currentP2MateValue;
+    } else {
+        player2TeamMateSelect.value = '';
     }
 }
 
-// Keep the original populatePlayerSelects for other uses (like user creation/editing if needed for full list)
-// Renamed to avoid confusion, but if not used elsewhere, it can be removed.
-function populatePlayerSelects() {
-    // This function will now only be called for places that need a full list,
-    // if you have any (e.g., admin features). For match creation, use populatePlayerSelectsForMatch.
-    // If not used, you can remove this function entirely.
-    const player1Select = document.getElementById('player1');
-    const player2Select = document.getElementById('player2');
 
-    const options = users.map(user =>
-        `<option value="${user.id}">${user.name} ${user.surname}</option>`
-    ).join('');
-
-    // Ensure the original <select> elements are NOT replaced by this in the match modal logic.
-    // This function is now effectively "deprecated" for match modal.
-    // player1Select.innerHTML = '<option value="">Sélectionner un joueur</option>' + options;
-    // player2Select.innerHTML = '<option value="">Sélectionner un joueur</option>' + options;
-}
-
-
+// NEW: Update Dashboard Function
 function updateDashboard() {
     document.getElementById('total-users').textContent = users.length;
     document.getElementById('total-matches').textContent = matches.length;
 }
 
-function editUser(userId) {
-    openUserModal(userId);
-}
-
+// --- Utility Functions (Toast, Loading) ---
 function showLoading() {
-    document.getElementById('loading').classList.add('active');
+    loading.style.display = 'flex';
 }
 
 function hideLoading() {
-    document.getElementById('loading').classList.remove('active');
+    loading.style.display = 'none';
 }
 
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    toast.classList.add('toast', type);
     toast.textContent = message;
-
-    container.appendChild(toast);
+    toastContainer.appendChild(toast);
 
     setTimeout(() => {
-        toast.remove();
-    }, 4000);
+        toast.classList.add('hide');
+        toast.addEventListener('transitionend', () => {
+            toast.remove();
+        });
+    }, 3000); // Hide after 3 seconds
 }
 
-window.addEventListener('error', function(event) {
-    console.error('Erreur JavaScript:', event.error);
-    showToast('Une erreur inattendue s\'est produite', 'error');
-});
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled Promise Rejection:', event.reason);
-    showToast('Une erreur réseau inattendue s\'est produite', 'error');
-});
+// Function to handle editing a user (called from displayUsers)
+function editUser(userId) {
+    openUserModal(userId);
+}
