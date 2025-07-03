@@ -459,18 +459,24 @@ function displayMatches() {
     });
 }
 
+// --- Pagination for Recent Matches ---
+// (variables déjà déclarées plus bas, donc on ne les redéclare pas ici)
+
 function displayRecentMatches() {
     const recentMatchesList = document.getElementById('recent-matches-list');
     recentMatchesList.innerHTML = '';
-    const recent5Matches = matches.slice(0, 5); // Get the 5 most recent matches
-    recent5Matches.forEach(match => {
+    const totalMatches = matches.length;
+    const totalPages = Math.ceil(totalMatches / recentMatchesPerPage);
+    if (recentMatchesCurrentPage > totalPages) recentMatchesCurrentPage = totalPages || 1;
+    const startIdx = (recentMatchesCurrentPage - 1) * recentMatchesPerPage;
+    const endIdx = startIdx + recentMatchesPerPage;
+    const pageMatches = matches.slice(startIdx, endIdx);
+    pageMatches.forEach(match => {
         const li = document.createElement('li');
-        // Construct player team names for display
         const player1TeamDisplay = `<strong>${match.player1_name} ${match.player1_surname}</strong>` +
             (match.is_2v2 ? ` & <strong>${match.player1_team_mate_name || 'N/A'} ${match.player1_team_mate_surname || ''}</strong>` : '');
         const player2TeamDisplay = `<strong>${match.player2_name} ${match.player2_surname}</strong>` +
             (match.is_2v2 ? ` & <strong>${match.player2_team_mate_name || 'N/A'} ${match.player2_team_mate_surname || ''}</strong>` : '');
-
         li.innerHTML = `
             <div class="match-info">
                 <span>${player1TeamDisplay} (${match.player1_score})</span>
@@ -484,394 +490,30 @@ function displayRecentMatches() {
         `;
         recentMatchesList.appendChild(li);
     });
+    // Update pagination info
+    document.getElementById('recent-matches-page-info').textContent = `Page ${recentMatchesCurrentPage} / ${totalPages || 1}`;
+    document.getElementById('recent-matches-prev').disabled = recentMatchesCurrentPage <= 1;
+    document.getElementById('recent-matches-next').disabled = recentMatchesCurrentPage >= totalPages;
 }
 
-async function handleMatchSubmit(event) {
-    event.preventDefault();
-    showLoading();
-
-    const formData = new FormData(event.target);
-    const data = Object.fromEntries(formData.entries());
-
-    const is2v2 = data.match_type === '2v2';
-
-    // Ensure player1_id is the logged-in user's ID
-    data.player1_id = loggedInUserId;
-
-    // Convert scores to numbers
-    data.player1_score = parseInt(data.player1_score);
-    data.player2_score = parseInt(data.player2_score);
-    
-    // Set 2v2 specific fields
-    data.is_2v2 = is2v2;
-    data.player1_team_mate_id = is2v2 ? parseInt(data.player1_team_mate_id) : null;
-    data.player2_team_mate_id = is2v2 ? parseInt(data.player2_team_mate_id) : null;
-
-    // Remove the temporary 'match_type' field as it's not needed by the backend directly
-    delete data.match_type; 
-    
-    // Frontend validation for 2v2 specific requirements
-    if (is2v2) {
-        if (!data.player1_team_mate_id || !data.player2_team_mate_id) {
-            showToast('Pour un match 2v2, les deux coéquipiers sont requis.', 'error');
-            hideLoading();
-            return;
-        }
-        if (data.player1_id === data.player1_team_mate_id) {
-            showToast('Le Joueur 1 ne peut pas être son propre coéquipier.', 'error');
-            hideLoading();
-            return;
-        }
-        if (data.player2_id === data.player2_team_mate_id) {
-            showToast('Le Joueur 2 ne peut pas être son propre coéquipier.', 'error');
-            hideLoading();
-            return;
-        }
-
-        // Check for unique players across all 4 positions
-        const allPlayerIds = [data.player1_id, data.player1_team_mate_id, data.player2_id, data.player2_team_mate_id];
-        const uniquePlayerIds = new Set(allPlayerIds);
-        if (uniquePlayerIds.size !== 4) { // Expect 4 unique players for 2v2
-            showToast('Un même joueur ne peut pas être sur plusieurs équipes dans un match 2v2.', 'error');
-            hideLoading();
-            return;
-        }
-    } else { // 1v1 validation
-        if (data.player1_id === data.player2_id) {
-            showToast('Le Joueur 1 et le Joueur 2 ne peuvent pas être la même personne dans un match 1v1.', 'error');
-            hideLoading();
-            return;
-        }
-    }
-
-
-    try {
-        const response = await authenticatedFetch(`${API_BASE}/matches`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Erreur lors de l\'enregistrement du match');
-        }
-
-        await loadMatches();
-        await updateDashboard(); // Update dashboard after new match is recorded
-        closeMatchModal();
-        showToast('Match enregistré avec succès!', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        hideLoading();
-    }
-}
-
-
-function switchTab(tabId) {
-    tabContents.forEach(content => {
-        content.classList.remove('active');
-    });
-    tabButtons.forEach(button => {
-        button.classList.remove('active');
-    });
-    document.getElementById(tabId).classList.add('active');
-    document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
-
-    // If switching to dashboard, ensure it's updated
-    if (tabId === 'dashboard' && loggedInUserId) {
-        updateDashboard();
-    }
-}
-
-function openUserModal(userId = null) {
-    const modalTitle = document.getElementById('user-modal-title');
-    const userForm = document.getElementById('user-form');
-    userForm.reset();
-
-    const userUsernameField = document.getElementById('user-username');
-    const userPasswordField = document.getElementById('user-password');
-
-    if (userId) {
-        currentEditingUser = users.find(u => u.id === userId);
-        if (currentEditingUser) {
-            modalTitle.textContent = 'Modifier le joueur';
-            document.getElementById('user-id').value = currentEditingUser.id;
-            document.getElementById('user-name').value = currentEditingUser.name;
-            document.getElementById('user-surname').value = currentEditingUser.surname;
-            userUsernameField.value = currentEditingUser.username;
-            userUsernameField.readOnly = true; // Prevent username change
-            userPasswordField.removeAttribute('required'); // Password not required on edit
-        }
-    } else {
-        modalTitle.textContent = 'Ajouter un joueur';
-        document.getElementById('user-id').value = '';
-        currentEditingUser = null;
-        userUsernameField.readOnly = false; // Reset readOnly status for new user
-        userPasswordField.setAttribute('required', 'required'); // Password required on create
-    }
-    userModal.classList.add('active');
-}
-
-function closeUserModal() {
-    userModal.classList.remove('active');
-    currentEditingUser = null;
-    document.getElementById('user-username').readOnly = false;
-    document.getElementById('user-password').setAttribute('required', 'required');
-}
-
-// MODIFIED: openMatchModal
-function openMatchModal() {
-    if (!loggedInUserId) {
-        showToast("Veuillez vous connecter pour enregistrer un match.", "error");
-        return;
-    }
-
-    matchModal.classList.add('active');
-    document.getElementById('match-form').reset();
-    // Default to 1v1 when opening the modal
-    document.querySelector('input[name="match_type"][value="1v1"]').checked = true;
-    toggleMatchFormFields(); // Call to set initial visibility based on default 1v1
-    populatePlayerSelectsForMatch(); // Populate dropdowns
-}
-
-function closeMatchModal() {
-    matchModal.classList.remove('active');
-}
-
-// NEW: Function to toggle form fields based on match type
-function toggleMatchFormFields() {
-    const is2v2 = document.querySelector('input[name="match_type"]:checked').value === '2v2';
-
-    if (is2v2) {
-        player1MateGroup.style.display = 'block';
-        player2MateGroup.style.display = 'block';
-        player1TeamMateSelect.setAttribute('required', 'required');
-        player2TeamMateSelect.setAttribute('required', 'required');
-    } else {
-        player1MateGroup.style.display = 'none';
-        player2MateGroup.style.display = 'none';
-        player1TeamMateSelect.removeAttribute('required');
-        player2TeamMateSelect.removeAttribute('required');
-        // Clear selections when switching back to 1v1
-        player1TeamMateSelect.value = '';
-        player2TeamMateSelect.value = '';
-    }
-    // Re-populate options to ensure correct filtering after toggle
-    updateTeamMateOptions(); 
-}
-
-
-// NEW: populatePlayerSelectsForMatch
-function populatePlayerSelectsForMatch() {
-    // Clear previous options
-    player1Select.innerHTML = '';
-    player2Select.innerHTML = '';
-    player1TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
-    player2TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
-
-
-    // Set Player 1 (the logged-in user)
-    const loggedInUser = users.find(u => u.id === loggedInUserId);
-    if (loggedInUser) {
-        const player1Option = document.createElement('option');
-        player1Option.value = loggedInUser.id;
-        player1Option.textContent = `${loggedInUser.name} ${loggedInUser.surname} (Moi)`;
-        player1Select.appendChild(player1Option);
-        player1Select.value = loggedInUser.id; // Pre-select
-        player1Select.disabled = true; // Make it non-changeable
-    } else {
-        player1Select.innerHTML = '<option value="">Erreur: Joueur non trouvé</option>';
-        player1Select.disabled = true;
-    }
-
-    // Populate Player 2 (opponent) - initially all other users
-    const defaultOption = document.createElement('option');
-    defaultOption.value = "";
-    defaultOption.textContent = "Sélectionner un adversaire";
-    player2Select.appendChild(defaultOption);
-
-    const otherUsers = users.filter(user => user.id !== loggedInUserId);
-    otherUsers.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = `${user.name} ${user.surname}`;
-        player2Select.appendChild(option);
-    });
-    
-    // Call updateTeamMateOptions after initial population
-    updateTeamMateOptions();
-}
-
-// NEW Function to update teammate dropdowns based on current player selections
-function updateTeamMateOptions() {
-    const selectedPlayer1Id = parseInt(player1Select.value);
-    const selectedPlayer2Id = parseInt(player2Select.value);
-    
-    // Store current selections to try and re-select after update
-    const currentP1MateValue = player1TeamMateSelect.value;
-    const currentP2MateValue = player2TeamMateSelect.value;
-
-    // Filter available players for team mates: exclude Player 1 and Player 2
-    let availableTeamMates = users.filter(user => 
-        user.id !== selectedPlayer1Id && 
-        user.id !== selectedPlayer2Id
-    );
-
-    // Populate player1TeamMateSelect
-    player1TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
-    availableTeamMates.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = `${user.name} ${user.surname}`;
-        player1TeamMateSelect.appendChild(option);
-    });
-
-    // Populate player2TeamMateSelect
-    player2TeamMateSelect.innerHTML = '<option value="">Sélectionner un coéquipier</option>';
-    availableTeamMates.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = `${user.name} ${user.surname}`;
-        player2TeamMateSelect.appendChild(option);
-    });
-
-    // Attempt to re-select previous values if they are still valid
-    if (availableTeamMates.some(u => u.id === parseInt(currentP1MateValue))) {
-        player1TeamMateSelect.value = currentP1MateValue;
-    } else {
-        player1TeamMateSelect.value = '';
-    }
-
-    if (availableTeamMates.some(u => u.id === parseInt(currentP2MateValue))) {
-        player2TeamMateSelect.value = currentP2MateValue;
-    } else {
-        player2TeamMateSelect.value = '';
-    }
-}
-
-
-// MODIFIED: Update Dashboard Function to include personal stats
-async function updateDashboard() {
-    document.getElementById('total-users').textContent = users.length;
-    document.getElementById('total-matches').textContent = matches.length;
-
-    if (loggedInUserId) {
-        showLoading();
-        try {
-            const response = await authenticatedFetch(`${API_BASE}/users/${loggedInUserId}/stats`);
-            const stats = await response.json();
-
-            // Display overall personal stats
-            personalTotalMatches.textContent = stats.overall_stats.total_matches;
-            personalWins.textContent = stats.overall_stats.wins;
-            personalLosses.textContent = stats.overall_stats.losses;
-            personalWinRate.textContent = `${stats.overall_stats.win_rate}%`;
-
-            // Calculate and display strongest opponent
-            const strongestOpponent = calculateStrongestOpponent(stats.opponent_stats);
-            if (strongestOpponent) {
-                strongestOpponentDisplay.textContent = `${strongestOpponent.opponent_name} ${strongestOpponent.opponent_surname}`;
-                strongestOpponentRecordDisplay.textContent = `(${strongestOpponent.wins_against} V - ${strongestOpponent.losses_against} D)`;
-            } else {
-                strongestOpponentDisplay.textContent = 'N/A';
-                strongestOpponentRecordDisplay.textContent = '';
-            }
-
-            // Calculate and display best teammate
-            const bestTeammate = calculateBestTeammate(stats.teammate_stats);
-            if (bestTeammate) {
-                bestTeammateDisplay.textContent = `${bestTeammate.teammate_name} ${bestTeammate.teammate_surname}`;
-                bestTeammateMatchesDisplay.textContent = `(${bestTeammate.matches_together} matchs ensemble)`;
-            } else {
-                bestTeammateDisplay.textContent = 'N/A';
-                bestTeammateMatchesDisplay.textContent = '';
-            }
-
-        } catch (error) {
-            console.error('Error loading personal stats:', error);
-            showToast('Erreur lors du chargement de vos statistiques personnelles.', 'error');
-            // Clear personal stats fields if there's an error
-            personalTotalMatches.textContent = '0';
-            personalWins.textContent = '0';
-            personalLosses.textContent = '0';
-            personalWinRate.textContent = '0%';
-            strongestOpponentDisplay.textContent = 'N/A';
-            strongestOpponentRecordDisplay.textContent = '';
-            bestTeammateDisplay.textContent = 'N/A';
-            bestTeammateMatchesDisplay.textContent = '';
-        } finally {
-            hideLoading();
-        }
-    }
-}
-
-// NEW: Helper function to find the strongest opponent
-function calculateStrongestOpponent(opponentStats) {
-    if (!opponentStats || opponentStats.length === 0) {
-        return null;
-    }
-
-    let strongest = null;
-    let highestLossRate = -1; // We want the opponent you lose to most often
-
-    opponentStats.forEach(opponent => {
-        if (opponent.total_games_against > 0) {
-            const lossRate = opponent.losses_against / opponent.total_games_against;
-            if (lossRate > highestLossRate) {
-                highestLossRate = lossRate;
-                strongest = opponent;
-            }
+function setupRecentMatchesPagination() {
+    document.getElementById('recent-matches-prev').addEventListener('click', function() {
+        if (recentMatchesCurrentPage > 1) {
+            recentMatchesCurrentPage--;
+            displayRecentMatches();
         }
     });
-    return strongest;
-}
-
-// NEW: Helper function to find the best teammate (most matches played together)
-function calculateBestTeammate(teammateStats) {
-    if (!teammateStats || teammateStats.length === 0) {
-        return null;
-    }
-
-    let best = null;
-    let maxMatches = -1;
-
-    teammateStats.forEach(teammate => {
-        if (teammate.matches_together > maxMatches) {
-            maxMatches = teammate.matches_together;
-            best = teammate;
+    document.getElementById('recent-matches-next').addEventListener('click', function() {
+        const totalPages = Math.ceil(matches.length / recentMatchesPerPage);
+        if (recentMatchesCurrentPage < totalPages) {
+            recentMatchesCurrentPage++;
+            displayRecentMatches();
         }
     });
-    return best;
 }
 
-
-// --- Utility Functions (Toast, Loading) ---
-function showLoading() {
-    loading.style.display = 'flex';
-}
-
-function hideLoading() {
-    loading.style.display = 'none';
-}
-
-function showToast(message, type = 'info') {
-    const toastContainer = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.classList.add('toast', type);
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('hide');
-        toast.addEventListener('transitionend', () => {
-            toast.remove();
-        });
-    }, 3000); // Hide after 3 seconds
-}
-
-// Function to handle editing a user (called from displayUsers)
-function editUser(userId) {
-    openUserModal(userId);
-}
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+    setupEventListeners();
+    setupRecentMatchesPagination();
+});
