@@ -62,10 +62,16 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
 
     setTimeout(() => {
-        document.querySelector('.intro-animation-overlay').classList.add('hide');
-        setTimeout(() => {
-            document.querySelector('.intro-animation-overlay').style.display = 'none';
-        }, 700);
+        const intro = document.querySelector('.intro-animation-overlay');
+        if (intro) {
+            intro.classList.add('hide');
+            setTimeout(() => {
+                intro.style.display = 'none';
+                // Show app content and nav tabs after intro
+                document.getElementById('app-content').style.display = 'block';
+                document.querySelectorAll('.nav-tabs .tab-btn').forEach(btn => btn.style.display = 'inline-flex');
+            }, 700);
+        }
     }, 2000); // 2 seconds
 });
 
