@@ -916,48 +916,41 @@ function editUser(userId) {
 // --- Ping Pong Intro Animation ---
 function startPingPongIntroAnimation() {
     const canvas = document.getElementById('pingpong-canvas');
-    const paddleImg = document.getElementById('paddle-img');
-    if (!canvas || !paddleImg) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let ballX = 200, ballY = 100, ballDX = 2, ballDY = 1.2, ballRadius = 10;
-    let leftPaddleY = 80, rightPaddleY = 80, paddleHeight = 64, paddleWidth = 64;
+    let ballX = 200, ballY = 100, ballDX = 2, ballDY = 1.2, ballRadius = 8;
+    let leftPaddleY = 80, rightPaddleY = 80, paddleHeight = 40, paddleWidth = 10;
     let frame = 0, maxFrames = 120;
-    const leftPaddleX = 50, rightPaddleX = 400 - 50 - paddleWidth;
-    // Wait for image to load
-    paddleImg.onload = function() {
-        draw();
-    };
-    if (paddleImg.complete) draw();
+
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Draw paddles (using image)
-        ctx.save();
-        ctx.translate(leftPaddleX + paddleWidth/2, leftPaddleY + paddleHeight/2);
-        ctx.rotate(-0.2 + Math.sin(frame/10)*0.1);
-        ctx.drawImage(paddleImg, -paddleWidth/2, -paddleHeight/2, paddleWidth, paddleHeight);
-        ctx.restore();
-        ctx.save();
-        ctx.translate(rightPaddleX + paddleWidth/2, rightPaddleY + paddleHeight/2);
-        ctx.scale(-1,1); // Mirror for right paddle
-        ctx.rotate(0.2 + Math.sin(frame/10)*0.1);
-        ctx.drawImage(paddleImg, -paddleWidth/2, -paddleHeight/2, paddleWidth, paddleHeight);
-        ctx.restore();
+
+        // Draw paddles
+        ctx.fillStyle = '#191970';
+        ctx.fillRect(30, leftPaddleY, paddleWidth, paddleHeight);
+        ctx.fillRect(360, rightPaddleY, paddleWidth, paddleHeight);
+
         // Draw ball
         ctx.beginPath();
         ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#e25822';
         ctx.fill();
+
         // Animate ball
         ballX += ballDX;
         ballY += ballDY;
+
         // Bounce on top/bottom
         if (ballY - ballRadius < 0 || ballY + ballRadius > canvas.height) ballDY *= -1;
+
         // Bounce on paddles
-        if (ballX - ballRadius < leftPaddleX + paddleWidth && ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) ballDX *= -1;
-        if (ballX + ballRadius > rightPaddleX && ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) ballDX *= -1;
+        if (ballX - ballRadius < 40 && ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) ballDX *= -1;
+        if (ballX + ballRadius > 360 && ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) ballDX *= -1;
+
         // Move paddles (simple AI)
         leftPaddleY += (ballY - (leftPaddleY + paddleHeight / 2)) * 0.08;
         rightPaddleY += (ballY - (rightPaddleY + paddleHeight / 2)) * 0.08;
+
         frame++;
         if (frame < maxFrames) {
             requestAnimationFrame(draw);
