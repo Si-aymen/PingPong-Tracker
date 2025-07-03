@@ -44,6 +44,8 @@ const strongestOpponentDisplay = document.getElementById('strongest-opponent');
 const strongestOpponentRecordDisplay = document.getElementById('strongest-opponent-record');
 const bestTeammateDisplay = document.getElementById('best-teammate');
 const bestTeammateMatchesDisplay = document.getElementById('best-teammate-matches');
+const easiestOpponentDisplay = document.getElementById('easiest-opponent'); // Ajout
+const easiestOpponentRecordDisplay = document.getElementById('easiest-opponent-record'); // Ajout
 
 
 // Initialisation de l'application
@@ -291,6 +293,8 @@ function logoutUser() {
     strongestOpponentRecordDisplay.textContent = '';
     bestTeammateDisplay.textContent = 'N/A';
     bestTeammateMatchesDisplay.textContent = '';
+    easiestOpponentDisplay.textContent = 'N/A'; // Ajout
+    easiestOpponentRecordDisplay.textContent = ''; // Ajout
 
 
     if (loggedInUserDisplay) {
@@ -779,6 +783,16 @@ async function updateDashboard() {
                 strongestOpponentRecordDisplay.textContent = '';
             }
 
+            // Calculate and display easiest opponent
+            const easiestOpponent = calculateEasiestOpponent(stats.opponent_stats);
+            if (easiestOpponent) {
+                easiestOpponentDisplay.textContent = `${easiestOpponent.opponent_name} ${easiestOpponent.opponent_surname}`;
+                easiestOpponentRecordDisplay.textContent = `(${easiestOpponent.wins_against} V - ${easiestOpponent.losses_against} D)`;
+            } else {
+                easiestOpponentDisplay.textContent = 'N/A';
+                easiestOpponentRecordDisplay.textContent = '';
+            }
+
             // Calculate and display best teammate
             const bestTeammate = calculateBestTeammate(stats.teammate_stats);
             if (bestTeammate) {
@@ -787,16 +801,6 @@ async function updateDashboard() {
             } else {
                 bestTeammateDisplay.textContent = 'N/A';
                 bestTeammateMatchesDisplay.textContent = '';
-            }
-
-            // Calculate and display easiest opponent
-            const easiestOpponent = calculateEasiestOpponent(stats.opponent_stats);
-            if (easiestOpponent) {
-                document.getElementById('easiest-opponent').textContent = `${easiestOpponent.opponent_name} ${easiestOpponent.opponent_surname}`;
-                document.getElementById('easiest-opponent-record').textContent = `(${easiestOpponent.wins_against} V - ${easiestOpponent.losses_against} D)`;
-            } else {
-                document.getElementById('easiest-opponent').textContent = 'N/A';
-                document.getElementById('easiest-opponent-record').textContent = '';
             }
 
         } catch (error) {
@@ -811,6 +815,8 @@ async function updateDashboard() {
             strongestOpponentRecordDisplay.textContent = '';
             bestTeammateDisplay.textContent = 'N/A';
             bestTeammateMatchesDisplay.textContent = '';
+            easiestOpponentDisplay.textContent = 'N/A'; // Ajout
+            easiestOpponentRecordDisplay.textContent = ''; // Ajout
         } finally {
             hideLoading();
         }
@@ -856,19 +862,20 @@ function calculateBestTeammate(teammateStats) {
     return best;
 }
 
-// Helper function to find the easiest opponent (most wins, at least 1 match, not self)
+// NEW: Helper function to find the easiest opponent (highest win rate against)
 function calculateEasiestOpponent(opponentStats) {
     if (!opponentStats || opponentStats.length === 0) {
         return null;
     }
+
     let easiest = null;
-    let maxWinRate = -1;
+    let highestWinRate = -1; // On veut l'adversaire contre qui on gagne le plus souvent
+
     opponentStats.forEach(opponent => {
-        if (opponent.total_games_against > 0 && opponent.opponent_id !== loggedInUserId) {
+        if (opponent.total_games_against > 0 && opponent.wins_against > 0) {
             const winRate = opponent.wins_against / opponent.total_games_against;
-            // Only consider if user has at least 1 win against this opponent
-            if (opponent.wins_against > 0 && winRate > maxWinRate) {
-                maxWinRate = winRate;
+            if (winRate > highestWinRate) {
+                highestWinRate = winRate;
                 easiest = opponent;
             }
         }
