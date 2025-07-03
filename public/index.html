@@ -6,39 +6,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PingPong Score Tracker</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Font Awesome for icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 
 <body>
-    <!-- Intro Animation Overlay - Initially visible -->
-    <div class="intro-animation-overlay active">
-        <!-- The animation content will be loaded here via an iframe -->
-        <iframe id="intro-animation-iframe" src="intro_animation.html" frameborder="0" scrolling="no"></iframe>
-    </div>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-table-tennis"></i> PingPong Tracker</h1>
+                <p>Suivez vos scores de ping-pong en temps réel</p>
+            </div>
+            <div class="auth-buttons">
+                <span id="logged-in-user-display" style="display: none; margin-right: 15px; font-weight: bold; color: #191970;"></span>
+                <button class="btn btn-primary" id="show-login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Se connecter
+                </button>
+                <button class="btn btn-secondary" id="show-register-btn">
+                    <i class="fas fa-user-plus"></i> S'inscrire
+                </button>
+                <button class="btn btn-danger" id="logout-btn" style="display: none;">
+                    <i class="fas fa-sign-out-alt"></i> Déconnexion
+                </button>
+            </div>
+        </header>
 
-    <!-- Main Application Content - Initially hidden by CSS and controlled by JS -->
-    <div id="app-content">
-        <div class="container">
-            <header class="header">
-                <div class="header-content">
-                    <h1><i class="fas fa-table-tennis"></i> PingPong Tracker</h1>
-                    <p>Suivez vos scores de ping-pong en temps réel</p>
-                </div>
-                <div class="auth-buttons">
-                    <span id="logged-in-user-display" style="display: none; margin-right: 15px; font-weight: bold; color: #191970;"></span>
-                    <button class="btn btn-primary" id="show-login-btn">
-                        <i class="fas fa-sign-in-alt"></i> Se connecter
-                    </button>
-                    <button class="btn btn-secondary" id="show-register-btn">
-                        <i class="fas fa-user-plus"></i> S'inscrire
-                    </button>
-                    <button class="btn btn-danger" id="logout-btn" style="display: none;">
-                        <i class="fas fa-sign-out-alt"></i> Déconnexion
-                    </button>
-                </div>
-            </header>
-
+        <div id="app-content" style="display: none;">
             <nav class="nav-tabs">
                 <button class="tab-btn active" data-tab="dashboard">
                     <i class="fas fa-chart-line"></i> Tableau de bord
@@ -102,13 +94,8 @@
                             <small id="best-teammate-matches"></small>
                         </div>
                     </div>
-                    <!-- NEW: Personalized Tip Button -->
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary" id="generate-tip-btn">
-                            <i class="fas fa-lightbulb"></i> Obtenir un Conseil Personnalisé ✨
-                        </button>
-                    </div>
                 </div>
+
 
                 <div class="recent-matches">
                     <h2><i class="fas fa-history"></i> Matchs récents</h2>
@@ -151,7 +138,6 @@
                                 <th>Joueur 2</th>
                                 <th>Vainqueur</th>
                                 <th>Date</th>
-                                <th>Analyse</th> <!-- NEW: Column for Match Analysis -->
                             </tr>
                         </thead>
                         <tbody id="matches-list">
@@ -162,7 +148,6 @@
         </div>
     </div>
 
-    <!-- User Modal -->
     <div id="user-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -199,7 +184,6 @@
         </div>
     </div>
 
-    <!-- Match Modal -->
     <div id="match-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -266,7 +250,6 @@
         </div>
     </div>
 
-    <!-- Register Modal -->
     <div id="register-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -302,7 +285,6 @@
         </div>
     </div>
 
-    <!-- Login Modal -->
     <div id="login-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -330,34 +312,17 @@
         </div>
     </div>
 
-    <!-- NEW: LLM Output Modal -->
-    <div id="llm-output-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-robot"></i> <span id="llm-modal-title">Analyse Générée</span></h3>
-                <button class="close-btn" id="close-llm-output-modal"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <p id="llm-output-text"></p>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" id="copy-llm-output-btn">
-                        <i class="fas fa-copy"></i> Copier
-                    </button>
-                    <button type="button" class="btn btn-primary" id="close-llm-output-modal-bottom">Fermer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Loading Spinner -->
     <div id="loading" class="loading">
         <div class="spinner"></div>
     </div>
 
-    <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js"></script>
+    <div id="intro-animation" class="intro-animation-overlay">
+        <canvas id="pingpong-canvas" width="400" height="200"></canvas>
+    </div>
+
+    <script src="js/app.js"></script>
 </body>
 
 </html>

@@ -1,3 +1,4 @@
+
 /* Reset et base */
 * {
     margin: 0;
@@ -10,7 +11,6 @@ body {
     background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 50%, #dcdcdc 100%);
     min-height: 100vh;
     color: #333;
-    overflow-x: hidden; /* Prevent horizontal scrollbar during animations */
 }
 
 .container {
@@ -675,78 +675,17 @@ body {
     display: none;
 }
 
-
-/* --- Intro Animation Overlay Styles --- */
 .intro-animation-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 50%, #dcdcdc 100%); /* Match body background */
+    background: #fff;
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.7s, visibility 0.7s; /* Add visibility for proper hiding */
-    visibility: visible; /* Ensure it's visible by default for the animation */
+    transition: opacity 0.7s;
 }
 .intro-animation-overlay.hide {
     opacity: 0;
     pointer-events: none;
-    visibility: hidden; /* Hide completely after fading out */
-}
-
-/* Styles for the iframe containing the animation */
-#intro-animation-iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    background: transparent; /* Ensure iframe background is transparent */
-    max-width: 600px; /* Match the table width in intro_animation.css */
-    max-height: 350px; /* Match the table height in intro_animation.css */
-    /* Ensure the iframe itself is centered and takes appropriate space */
-    display: block; /* Remove extra space below iframe */
-}
-
-/* Responsive adjustments for the iframe */
-@media (max-width: 768px) {
-    #intro-animation-iframe {
-        max-width: 450px;
-        max-height: 250px;
-    }
-}
-
-@media (max-width: 480px) {
-    #intro-animation-iframe {
-        max-width: 300px;
-        max-height: 180px;
-    }
-}
-
-/* Additional styles for LLM Output Modal */
-#llm-output-modal .modal-body {
-    padding: 15px 0;
-}
-
-#llm-output-modal #llm-output-text {
-    white-space: pre-wrap; /* Preserve whitespace and line breaks */
-    font-size: 1.1rem;
-    color: #4a4a4a;
-    background-color: #f0f0f0;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    margin-bottom: 20px;
-    max-height: 300px; /* Limit height for scrollability */
-    overflow-y: auto;
-}
-
-#llm-output-modal .form-actions {
-    justify-content: center; /* Center buttons in LLM modal */
-}
-
-.text-center {
-    text-align: center;
-}
-
-.mt-4 {
-    margin-top: 1.5rem; /* Equivalent to 24px */
 }

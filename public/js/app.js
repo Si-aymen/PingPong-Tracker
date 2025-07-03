@@ -47,80 +47,13 @@ const bestTeammateMatchesDisplay = document.getElementById('best-teammate-matche
 const easiestOpponentDisplay = document.getElementById('easiest-opponent'); // Ajout
 const easiestOpponentRecordDisplay = document.getElementById('easiest-opponent-record'); // Ajout
 
-// Toast Container
-const toastContainer = document.getElementById('toast-container');
-
-// Intro Animation Elements
-const introAnimationOverlay = document.querySelector('.intro-animation-overlay');
-
-// NEW LLM Output Modal elements
-const llmOutputModal = document.getElementById('llm-output-modal');
-const llmModalTitle = document.getElementById('llm-modal-title');
-const llmOutputText = document.getElementById('llm-output-text');
-const closeLlmOutputModalBtn = document.getElementById('close-llm-output-modal');
-const closeLlmOutputModalBottomBtn = document.getElementById('close-llm-output-modal-bottom');
-const copyLlmOutputBtn = document.getElementById('copy-llm-output-btn');
-
-// NEW LLM Feature Buttons
-const generateTipBtn = document.getElementById('generate-tip-btn');
-
 
 // Initialisation de l'application
 document.addEventListener('DOMContentLoaded', function() {
-    // Start the intro animation and then initialize the app
-    // The intro animation will handle showing/hiding the overlay and then call initializeApp
-    startIntroAnimationAndInitializeApp();
+    initializeApp();
     setupEventListeners();
+    startPingPongIntroAnimation(); // Start the animation on load
 });
-
-// Function to show a toast notification
-function showToast(message, type = 'info', duration = 4000) {
-    const toast = document.createElement('div');
-    toast.classList.add('toast', type);
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
-
-    // Trigger reflow to restart animation for new toasts
-    void toast.offsetWidth;
-
-    toast.style.animation = `slideInRight 0.5s forwards, fadeOut 0.5s ${duration / 1000 - 0.5}s forwards`;
-
-    setTimeout(() => {
-        toast.remove();
-    }, duration);
-}
-
-// Function to show loading spinner
-function showLoading() {
-    loading.classList.add('active');
-}
-
-// Function to hide loading spinner
-function hideLoading() {
-    loading.classList.remove('active');
-}
-
-// Controls the intro animation and then initializes the main app
-function startIntroAnimationAndInitializeApp() {
-    // Simulate a loading time for the animation to play
-    const animationDuration = 5000; // Increased to 5 seconds for the new animation
-    
-    setTimeout(() => {
-        // Add 'hide' class to trigger CSS fade-out transition
-        if (introAnimationOverlay) {
-            introAnimationOverlay.classList.add('hide');
-            // Listen for the end of the transition to fully hide and show app content
-            introAnimationOverlay.addEventListener('transitionend', () => {
-                introAnimationOverlay.style.display = 'none'; // Fully hide after animation
-                initializeApp(); // Now initialize the main application
-            }, { once: true }); // Ensure listener runs only once
-        } else {
-            // Fallback if introAnimationOverlay is not found
-            initializeApp();
-        }
-    }, animationDuration);
-}
-
 
 // Initialisation
 async function initializeApp() {
@@ -200,7 +133,6 @@ function setupEventListeners() {
         if (event.target === matchModal) closeMatchModal();
         if (event.target === registerModal) closeRegisterModal();
         if (event.target === loginModal) closeLoginModal();
-        if (event.target === llmOutputModal) closeLlmOutputModal(); // Close LLM modal
     });
 
     // Auth Event Listeners
@@ -226,16 +158,6 @@ function setupEventListeners() {
     player2Select.addEventListener('change', updateTeamMateOptions);
     player1TeamMateSelect.addEventListener('change', updateTeamMateOptions);
     player2TeamMateSelect.addEventListener('change', updateTeamMateOptions);
-
-    // NEW LLM Modal Event Listeners
-    closeLlmOutputModalBtn.addEventListener('click', closeLlmOutputModal);
-    closeLlmOutputModalBottomBtn.addEventListener('click', closeLlmOutputModal);
-    copyLlmOutputBtn.addEventListener('click', copyLlmOutput);
-
-    // NEW LLM Feature Button Event Listeners
-    if (generateTipBtn) {
-        generateTipBtn.addEventListener('click', generatePersonalizedTip);
-    }
 }
 
 // --- UI Display Functions ---
@@ -372,8 +294,8 @@ function logoutUser() {
     strongestOpponentRecordDisplay.textContent = '';
     bestTeammateDisplay.textContent = 'N/A';
     bestTeammateMatchesDisplay.textContent = '';
-    easiestOpponentDisplay.textContent = 'N/A';
-    easiestOpponentRecordDisplay.textContent = '';
+    easiestOpponentDisplay.textContent = 'N/A'; // Ajout
+    easiestOpponentRecordDisplay.textContent = ''; // Ajout
 
 
     if (loggedInUserDisplay) {
@@ -537,11 +459,6 @@ function displayMatches() {
             <td>${player2TeamDisplay}</td>
             <td>${winnerNameDisplay}</td>
             <td>${new Date(match.match_date).toLocaleDateString()}</td>
-            <td>
-                <button class="btn btn-sm btn-info" onclick="generateMatchAnalysis(${match.id})">
-                    <i class="fas fa-brain"></i> Analyse ✨
-                </button>
-            </td>
         `;
         matchesList.appendChild(row);
     });
@@ -838,105 +755,6 @@ function updateTeamMateOptions() {
     }
 }
 
-// Helper function to calculate strongest opponent
-function calculateStrongestOpponent(opponentStats) {
-    if (!opponentStats || Object.keys(opponentStats).length === 0) {
-        return null;
-    }
-
-    let strongest = null;
-    let minWinRateAgainst = 101; // Higher than 100 to ensure first opponent is picked
-
-    for (const opponentId in opponentStats) {
-        const stats = opponentStats[opponentId];
-        // Calculate win rate against this opponent
-        const totalGames = stats.wins_against + stats.losses_against;
-        if (totalGames === 0) continue; // Skip if no games played against this opponent
-
-        const winRate = (stats.wins_against / totalGames) * 100;
-
-        // A "strongest" opponent is one you have a low win rate against,
-        // or if win rates are equal, one you have more losses against.
-        if (winRate < minWinRateAgainst || (winRate === minWinRateAgainst && stats.losses_against > (strongest ? strongest.losses_against : -1))) {
-            const opponentUser = users.find(u => u.id === parseInt(opponentId));
-            if (opponentUser) {
-                strongest = {
-                    opponent_id: parseInt(opponentId),
-                    opponent_name: opponentUser.name,
-                    opponent_surname: opponentUser.surname,
-                    wins_against: stats.wins_against,
-                    losses_against: stats.losses_against,
-                    win_rate_against: winRate
-                };
-                minWinRateAgainst = winRate;
-            }
-        }
-    }
-    return strongest;
-}
-
-// Helper function to calculate easiest opponent
-function calculateEasiestOpponent(opponentStats) {
-    if (!opponentStats || Object.keys(opponentStats).length === 0) {
-        return null;
-    }
-
-    let easiest = null;
-    let maxWinRateAgainst = -1; // Lower than 0 to ensure first opponent is picked
-
-    for (const opponentId in opponentStats) {
-        const stats = opponentStats[opponentId];
-        const totalGames = stats.wins_against + stats.losses_against;
-        if (totalGames === 0) continue;
-
-        const winRate = (stats.wins_against / totalGames) * 100;
-
-        // An "easiest" opponent is one you have a high win rate against,
-        // or if win rates are equal, one you have more wins against.
-        if (winRate > maxWinRateAgainst || (winRate === maxWinRateAgainst && stats.wins_against > (easiest ? easiest.wins_against : -1))) {
-            const opponentUser = users.find(u => u.id === parseInt(opponentId));
-            if (opponentUser) {
-                easiest = {
-                    opponent_id: parseInt(opponentId),
-                    opponent_name: opponentUser.name,
-                    opponent_surname: opponentUser.surname,
-                    wins_against: stats.wins_against,
-                    losses_against: stats.losses_against,
-                    win_rate_against: winRate
-                };
-                maxWinRateAgainst = winRate;
-            }
-        }
-    }
-    return easiest;
-}
-
-// Helper function to calculate best teammate
-function calculateBestTeammate(teammateStats) {
-    if (!teammateStats || Object.keys(teammateStats).length === 0) {
-        return null;
-    }
-
-    let best = null;
-    let maxMatchesTogether = 0;
-
-    for (const teammateId in teammateStats) {
-        const stats = teammateStats[teammateId];
-        if (stats.matches_together > maxMatchesTogether) {
-            const teammateUser = users.find(u => u.id === parseInt(teammateId));
-            if (teammateUser) {
-                best = {
-                    teammate_id: parseInt(teammateId),
-                    teammate_name: teammateUser.name,
-                    teammate_surname: teammateUser.surname,
-                    matches_together: stats.matches_together
-                };
-                maxMatchesTogether = stats.matches_together;
-            }
-        }
-    }
-    return best;
-}
 
 // MODIFIED: Update Dashboard Function to include personal stats
 async function updateDashboard() {
@@ -988,7 +806,7 @@ async function updateDashboard() {
         } catch (error) {
             console.error('Error loading personal stats:', error);
             showToast('Erreur lors du chargement de vos statistiques personnelles.', 'error');
-            // Clear personal stats if there's an error
+            // Clear personal stats fields if there's an error
             personalTotalMatches.textContent = '0';
             personalWins.textContent = '0';
             personalLosses.textContent = '0';
@@ -997,224 +815,151 @@ async function updateDashboard() {
             strongestOpponentRecordDisplay.textContent = '';
             bestTeammateDisplay.textContent = 'N/A';
             bestTeammateMatchesDisplay.textContent = '';
-            easiestOpponentDisplay.textContent = 'N/A';
-            easiestOpponentRecordDisplay.textContent = '';
+            easiestOpponentDisplay.textContent = 'N/A'; // Ajout
+            easiestOpponentRecordDisplay.textContent = ''; // Ajout
         } finally {
             hideLoading();
         }
     }
 }
 
-// Global function to be called from inline HTML (edit/delete buttons)
-window.editUser = function(userId) {
+// NEW: Helper function to find the strongest opponent
+function calculateStrongestOpponent(opponentStats) {
+    if (!opponentStats || opponentStats.length === 0) {
+        return null;
+    }
+
+    let strongest = null;
+    let highestLossRate = -1; // We want the opponent you lose to most often
+
+    opponentStats.forEach(opponent => {
+        if (opponent.total_games_against > 0) {
+            const lossRate = opponent.losses_against / opponent.total_games_against;
+            if (lossRate > highestLossRate) {
+                highestLossRate = lossRate;
+                strongest = opponent;
+            }
+        }
+    });
+    return strongest;
+}
+
+// NEW: Helper function to find the best teammate (most matches played together)
+function calculateBestTeammate(teammateStats) {
+    if (!teammateStats || teammateStats.length === 0) {
+        return null;
+    }
+
+    let best = null;
+    let maxMatches = -1;
+
+    teammateStats.forEach(teammate => {
+        if (teammate.matches_together > maxMatches) {
+            maxMatches = teammate.matches_together;
+            best = teammate;
+        }
+    });
+    return best;
+}
+
+// NEW: Helper function to find the easiest opponent (highest win rate against)
+function calculateEasiestOpponent(opponentStats) {
+    if (!opponentStats || opponentStats.length === 0) {
+        return null;
+    }
+
+    let easiest = null;
+    let highestWinRate = -1; // On veut l'adversaire contre qui on gagne le plus souvent
+
+    opponentStats.forEach(opponent => {
+        if (opponent.total_games_against > 0 && opponent.wins_against > 0) {
+            const winRate = opponent.wins_against / opponent.total_games_against;
+            if (winRate > highestWinRate) {
+                highestWinRate = winRate;
+                easiest = opponent;
+            }
+        }
+    });
+    return easiest;
+}
+
+
+// --- Utility Functions (Toast, Loading) ---
+function showLoading() {
+    loading.style.display = 'flex';
+}
+
+function hideLoading() {
+    loading.style.display = 'none';
+}
+
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.classList.add('toast', type);
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('hide');
+        toast.addEventListener('transitionend', () => {
+            toast.remove();
+        });
+    }, 3000); // Hide after 3 seconds
+}
+
+// Function to handle editing a user (called from displayUsers)
+function editUser(userId) {
     openUserModal(userId);
-};
-
-window.deleteUser = function(userId) {
-    // Implement a custom confirmation dialog here instead of `confirm()`
-    // For now, directly call deleteUser for brevity, but a modal is recommended.
-    // Example: showCustomConfirm('Are you sure you want to delete this user?', () => deleteUserConfirmed(userId));
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce joueur ?")) {
-        deleteUserConfirmed(userId);
-    }
-};
-
-async function deleteUserConfirmed(userId) {
-    showLoading();
-    try {
-        const response = await authenticatedFetch(`${API_BASE}/users/${userId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Erreur lors de la suppression du joueur');
-        }
-
-        await loadUsers();
-        await loadMatches();
-        updateDashboard();
-        populatePlayerSelectsForMatch();
-        showToast('Joueur supprimé avec succès!', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        hideLoading();
-    }
 }
 
-// --- NEW LLM Integration Functions ---
+// --- Ping Pong Intro Animation ---
+function startPingPongIntroAnimation() {
+    const canvas = document.getElementById('pingpong-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let ballX = 200, ballY = 100, ballDX = 2, ballDY = 1.2, ballRadius = 8;
+    let leftPaddleY = 80, rightPaddleY = 80, paddleHeight = 40, paddleWidth = 10;
+    let frame = 0, maxFrames = 120;
 
-/**
- * Opens the LLM output modal and displays the generated text.
- * @param {string} title - The title for the modal.
- * @param {string} text - The generated text to display.
- */
-function openLlmOutputModal(title, text) {
-    llmModalTitle.textContent = title;
-    llmOutputText.textContent = text;
-    llmOutputModal.classList.add('active');
-}
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-/**
- * Closes the LLM output modal.
- */
-function closeLlmOutputModal() {
-    llmOutputModal.classList.remove('active');
-    llmOutputText.textContent = ''; // Clear content
-}
+        // Draw paddles
+        ctx.fillStyle = '#191970';
+        ctx.fillRect(30, leftPaddleY, paddleWidth, paddleHeight);
+        ctx.fillRect(360, rightPaddleY, paddleWidth, paddleHeight);
 
-/**
- * Copies the text from the LLM output modal to the clipboard.
- */
-function copyLlmOutput() {
-    const textToCopy = llmOutputText.textContent;
-    const textArea = document.createElement("textarea");
-    textArea.value = textToCopy;
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-        document.execCommand('copy');
-        showToast('Texte copié dans le presse-papiers !', 'success');
-    } catch (err) {
-        console.error('Impossible de copier le texte: ', err);
-        showToast('Échec de la copie du texte.', 'error');
-    }
-    document.body.removeChild(textArea);
-}
+        // Draw ball
+        ctx.beginPath();
+        ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = '#e25822';
+        ctx.fill();
 
+        // Animate ball
+        ballX += ballDX;
+        ballY += ballDY;
 
-/**
- * Generates and displays a match analysis using the Gemini API.
- * @param {number} matchId - The ID of the match to analyze.
- */
-window.generateMatchAnalysis = async function(matchId) {
-    const match = matches.find(m => m.id === matchId);
-    if (!match) {
-        showToast('Match non trouvé.', 'error');
-        return;
-    }
+        // Bounce on top/bottom
+        if (ballY - ballRadius < 0 || ballY + ballRadius > canvas.height) ballDY *= -1;
 
-    showLoading();
-    llmOutputText.textContent = 'Génération de l\'analyse...';
-    openLlmOutputModal('Analyse de Match ✨', 'Génération en cours...');
+        // Bounce on paddles
+        if (ballX - ballRadius < 40 && ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) ballDX *= -1;
+        if (ballX + ballRadius > 360 && ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) ballDX *= -1;
 
-    try {
-        const player1FullName = `${match.player1_name} ${match.player1_surname}`;
-        const player2FullName = `${match.player2_name} ${match.player2_surname}`;
-        const winnerFullName = `${match.winner_name} ${match.winner_surname}`;
-        const is2v2Text = match.is_2v2 ? ` (match en double avec ${match.player1_team_mate_name} et ${match.player2_team_mate_name})` : '';
+        // Move paddles (simple AI)
+        leftPaddleY += (ballY - (leftPaddleY + paddleHeight / 2)) * 0.08;
+        rightPaddleY += (ballY - (rightPaddleY + paddleHeight / 2)) * 0.08;
 
-        const prompt = `Générez un commentaire court et engageant pour un match de ping-pong entre ${player1FullName} (score ${match.player1_score}) et ${player2FullName} (score ${match.player2_score}), où ${winnerFullName} a gagné${is2v2Text}. Mettez en évidence les moments clés ou les performances des joueurs. Restez concis.`;
-
-        let chatHistory = [];
-        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-        const payload = { contents: chatHistory };
-        const apiKey = ""; // Leave as-is, Canvas will provide it
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Erreur API Gemini: ${response.status}`);
-        }
-
-        const result = await response.json();
-        if (result.candidates && result.candidates.length > 0 &&
-            result.candidates[0].content && result.candidates[0].content.parts &&
-            result.candidates[0].content.parts.length > 0) {
-            const analysisText = result.candidates[0].content.parts[0].text;
-            llmOutputText.textContent = analysisText;
-            llmModalTitle.textContent = 'Analyse de Match Générée ✨';
+        frame++;
+        if (frame < maxFrames) {
+            requestAnimationFrame(draw);
         } else {
-            throw new Error('Aucune analyse générée par l\'IA.');
+            document.getElementById('intro-animation').classList.add('hide');
+            setTimeout(() => {
+                document.getElementById('intro-animation').style.display = 'none';
+            }, 700);
         }
-
-    } catch (error) {
-        console.error('Erreur lors de la génération de l\'analyse de match:', error);
-        llmOutputText.textContent = `Erreur lors de la génération: ${error.message}. Veuillez réessayer.`;
-        llmModalTitle.textContent = 'Erreur d\'Analyse';
-        showToast('Erreur lors de la génération de l\'analyse.', 'error');
-    } finally {
-        hideLoading();
     }
-};
-
-/**
- * Generates and displays a personalized tip for the logged-in user using the Gemini API.
- */
-async function generatePersonalizedTip() {
-    if (!loggedInUserId) {
-        showToast('Veuillez vous connecter pour obtenir un conseil personnalisé.', 'error');
-        return;
-    }
-
-    showLoading();
-    llmOutputText.textContent = 'Génération de votre conseil...';
-    openLlmOutputModal('Conseil Personnalisé ✨', 'Génération en cours...');
-
-    try {
-        const responseStats = await authenticatedFetch(`${API_BASE}/users/${loggedInUserId}/stats`);
-        const stats = await responseStats.json();
-
-        const totalMatches = stats.overall_stats.total_matches;
-        const wins = stats.overall_stats.wins;
-        const losses = stats.overall_stats.losses;
-        const winRate = stats.overall_stats.win_rate;
-
-        const strongestOpponent = calculateStrongestOpponent(stats.opponent_stats);
-        const easiestOpponent = calculateEasiestOpponent(stats.opponent_stats);
-
-        let prompt = `Je suis un joueur de ping-pong nommé ${loggedInUserFullName}. Mes statistiques sont: ${totalMatches} matchs joués, ${wins} victoires, ${losses} défaites, et un taux de victoire de ${winRate}%.`;
-
-        if (strongestOpponent) {
-            prompt += ` Mon adversaire le plus fort est ${strongestOpponent.opponent_name} ${strongestOpponent.opponent_surname} (record contre lui: ${strongestOpponent.wins_against}V-${strongestOpponent.losses_against}D).`;
-        }
-        if (easiestOpponent) {
-            prompt += ` Mon adversaire le plus facile est ${easiestOpponent.opponent_name} ${easiestOpponent.opponent_surname} (record contre lui: ${easiestOpponent.wins_against}V-${easiestOpponent.losses_against}D).`;
-        }
-
-        prompt += ` Sur la base de ces informations, donnez-moi un conseil concis et actionnable pour améliorer mon jeu de ping-pong.`;
-
-        let chatHistory = [];
-        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-        const payload = { contents: chatHistory };
-        const apiKey = ""; // Leave as-is, Canvas will provide it
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Erreur API Gemini: ${response.status}`);
-        }
-
-        const result = await response.json();
-        if (result.candidates && result.candidates.length > 0 &&
-            result.candidates[0].content && result.candidates[0].content.parts &&
-            result.candidates[0].content.parts.length > 0) {
-            const tipText = result.candidates[0].content.parts[0].text;
-            llmOutputText.textContent = tipText;
-            llmModalTitle.textContent = 'Votre Conseil Personnalisé ✨';
-        } else {
-            throw new Error('Aucun conseil généré par l\'IA.');
-        }
-
-    } catch (error) {
-        console.error('Erreur lors de la génération du conseil personnalisé:', error);
-        llmOutputText.textContent = `Erreur lors de la génération: ${error.message}. Veuillez réessayer.`;
-        llmModalTitle.textContent = 'Erreur de Conseil';
-        showToast('Erreur lors de la génération du conseil personnalisé.', 'error');
-    } finally {
-        hideLoading();
-    }
-};
+    draw();
+}
