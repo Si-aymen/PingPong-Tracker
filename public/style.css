@@ -698,7 +698,7 @@ body {
     width: 300px; /* Adjust size as needed */
     height: 200px;
     position: relative;
-    background: rgba(255, 255, 255, 0.4); /* Frosted glass effect for the table */
+    background: #b3e0ff; /* Light blue table */
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     overflow: hidden; /* Ensure ball/paddles stay within bounds */

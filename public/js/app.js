@@ -60,6 +60,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // The intro animation will handle showing/hiding the overlay and then call initializeApp
     startIntroAnimationAndInitializeApp();
     setupEventListeners();
+
+    setTimeout(() => {
+        document.querySelector('.intro-animation-overlay').classList.add('hide');
+        setTimeout(() => {
+            document.querySelector('.intro-animation-overlay').style.display = 'none';
+        }, 700);
+    }, 2000); // 2 seconds
 });
 
 // Function to show a toast notification
