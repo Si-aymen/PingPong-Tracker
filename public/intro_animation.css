@@ -1,0 +1,267 @@
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 50%, #dcdcdc 100%);
+    overflow: hidden; /* Prevent scrollbars */
+}
+
+.animation-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.table {
+    width: 600px; /* Increased size for more detail */
+    height: 350px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+}
+
+.net {
+    position: absolute;
+    width: 4px;
+    height: 90%;
+    background-color: rgba(255, 255, 255, 0.6);
+    left: 50%;
+    top: 5%;
+    transform: translateX(-50%);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.player {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 2;
+}
+
+.player-left {
+    left: 40px;
+    animation: playerLeftMove 5s ease-in-out infinite alternate;
+}
+
+.player-right {
+    right: 40px;
+    animation: playerRightMove 5s ease-in-out infinite alternate;
+}
+
+.player-head {
+    width: 30px;
+    height: 30px;
+    background: #191970; /* Dark blue */
+    border-radius: 50%;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    margin-bottom: 5px;
+}
+
+.player-body {
+    width: 40px;
+    height: 50px;
+    background: #ff69b4; /* Pink */
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.paddle {
+    position: absolute; /* Position relative to player */
+    width: 12px;
+    height: 70px;
+    background: #191970;
+    border-radius: 6px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    transform-origin: center center;
+    z-index: 3;
+}
+
+.left-paddle {
+    left: 55px; /* Adjust based on player position */
+    top: 50%; /* Vertically align with player's body */
+    transform: translateY(-50%) rotate(0deg);
+    animation: paddleLeftHit 5s ease-in-out infinite alternate;
+}
+
+.right-paddle {
+    right: 55px; /* Adjust based on player position */
+    top: 50%; /* Vertically align with player's body */
+    transform: translateY(-50%) rotate(0deg);
+    animation: paddleRightHit 5s ease-in-out infinite alternate;
+}
+
+.ball {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: #ff69b4;
+    border-radius: 50%;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    animation: ballBounce 5s linear infinite;
+    z-index: 4; /* Highest z-index for the ball */
+}
+
+/* Player Movement Animations */
+@keyframes playerLeftMove {
+    0%, 100% { top: 70px; }
+    25% { top: 120px; }
+    50% { top: 70px; }
+    75% { top: 120px; }
+}
+
+@keyframes playerRightMove {
+    0%, 100% { top: 120px; }
+    25% { top: 70px; }
+    50% { top: 120px; }
+    75% { top: 70px; }
+}
+
+/* Paddle Hit Animations (slight rotation/movement) */
+@keyframes paddleLeftHit {
+    0%, 100% { transform: translateY(-50%) rotate(0deg); }
+    10% { transform: translateY(-50%) rotate(10deg); } /* Swing forward */
+    40% { transform: translateY(-50%) rotate(0deg); }
+}
+
+@keyframes paddleRightHit {
+    0%, 100% { transform: translateY(-50%) rotate(0deg); }
+    60% { transform: translateY(-50%) rotate(-10deg); } /* Swing forward */
+    90% { transform: translateY(-50%) rotate(0deg); }
+}
+
+/* Ball Bounce Animation */
+@keyframes ballBounce {
+    0% {
+        left: 100px; /* Start near left paddle */
+        top: 150px; /* Initial vertical position */
+        transform: scale(1);
+    }
+    10% {
+        left: 150px;
+        top: 80px; /* Arc upwards */
+        transform: scale(0.9);
+    }
+    25% {
+        left: 280px; /* Middle of the table */
+        top: 150px;
+        transform: scale(0.8); /* Smaller when further away */
+    }
+    40% {
+        left: 450px;
+        top: 80px; /* Arc upwards */
+        transform: scale(0.9);
+    }
+    50% {
+        left: 500px; /* Hit right paddle */
+        top: 150px;
+        transform: scale(1);
+    }
+    60% {
+        left: 450px;
+        top: 80px; /* Arc upwards */
+        transform: scale(0.9);
+    }
+    75% {
+        left: 280px; /* Middle of the table */
+        top: 150px;
+        transform: scale(0.8);
+    }
+    90% {
+        left: 150px;
+        top: 80px; /* Arc upwards */
+        transform: scale(0.9);
+    }
+    100% {
+        left: 100px; /* Hit left paddle */
+        top: 150px;
+        transform: scale(1);
+    }
+}
+
+/* Responsive Adjustments for Animation */
+@media (max-width: 768px) {
+    .table {
+        width: 450px;
+        height: 250px;
+    }
+    .player-head {
+        width: 25px;
+        height: 25px;
+    }
+    .player-body {
+        width: 35px;
+        height: 40px;
+    }
+    .paddle {
+        width: 10px;
+        height: 60px;
+    }
+    .ball {
+        width: 16px;
+        height: 16px;
+    }
+    .player-left { left: 30px; }
+    .player-right { right: 30px; }
+    .left-paddle { left: 40px; }
+    .right-paddle { right: 40px; }
+
+    @keyframes ballBounce {
+        0% { left: 70px; top: 100px; transform: scale(1); }
+        25% { left: 200px; top: 60px; transform: scale(0.9); }
+        50% { left: 380px; top: 100px; transform: scale(1); }
+        75% { left: 200px; top: 140px; transform: scale(0.9); }
+        100% { left: 70px; top: 100px; transform: scale(1); }
+    }
+}
+
+@media (max-width: 480px) {
+    .table {
+        width: 300px;
+        height: 180px;
+    }
+    .player-head {
+        width: 20px;
+        height: 20px;
+    }
+    .player-body {
+        width: 30px;
+        height: 35px;
+    }
+    .paddle {
+        width: 8px;
+        height: 50px;
+    }
+    .ball {
+        width: 14px;
+        height: 14px;
+    }
+    .player-left { left: 20px; }
+    .player-right { right: 20px; }
+    .left-paddle { left: 30px; }
+    .right-paddle { right: 30px; }
+
+    @keyframes ballBounce {
+        0% { left: 50px; top: 80px; transform: scale(1); }
+        25% { left: 130px; top: 50px; transform: scale(0.9); }
+        50% { left: 250px; top: 80px; transform: scale(1); }
+        75% { left: 130px; top: 110px; transform: scale(0.9); }
+        100% { left: 50px; top: 80px; transform: scale(1); }
+    }
+}
