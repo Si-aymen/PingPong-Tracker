@@ -47,13 +47,69 @@ const bestTeammateMatchesDisplay = document.getElementById('best-teammate-matche
 const easiestOpponentDisplay = document.getElementById('easiest-opponent'); // Ajout
 const easiestOpponentRecordDisplay = document.getElementById('easiest-opponent-record'); // Ajout
 
+// Toast Container
+const toastContainer = document.getElementById('toast-container');
+
+// Intro Animation Elements
+const introAnimationOverlay = document.querySelector('.intro-animation-overlay');
+
 
 // Initialisation de l'application
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    // Start the intro animation and then initialize the app
+    // The intro animation will handle showing/hiding the overlay and then call initializeApp
+    startIntroAnimationAndInitializeApp();
     setupEventListeners();
-    startPingPongIntroAnimation(); // Start the animation on load
 });
+
+// Function to show a toast notification
+function showToast(message, type = 'info', duration = 4000) {
+    const toast = document.createElement('div');
+    toast.classList.add('toast', type);
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+
+    // Trigger reflow to restart animation for new toasts
+    void toast.offsetWidth;
+
+    toast.style.animation = `slideInRight 0.5s forwards, fadeOut 0.5s ${duration / 1000 - 0.5}s forwards`;
+
+    setTimeout(() => {
+        toast.remove();
+    }, duration);
+}
+
+// Function to show loading spinner
+function showLoading() {
+    loading.classList.add('active');
+}
+
+// Function to hide loading spinner
+function hideLoading() {
+    loading.classList.remove('active');
+}
+
+// Controls the intro animation and then initializes the main app
+function startIntroAnimationAndInitializeApp() {
+    // Simulate a loading time for the animation to play
+    const animationDuration = 3000; // 3 seconds for the animation to play
+    
+    setTimeout(() => {
+        // Add 'hide' class to trigger CSS fade-out transition
+        if (introAnimationOverlay) {
+            introAnimationOverlay.classList.add('hide');
+            // Listen for the end of the transition to fully hide and show app content
+            introAnimationOverlay.addEventListener('transitionend', () => {
+                introAnimationOverlay.style.display = 'none'; // Fully hide after animation
+                initializeApp(); // Now initialize the main application
+            }, { once: true }); // Ensure listener runs only once
+        } else {
+            // Fallback if introAnimationOverlay is not found
+            initializeApp();
+        }
+    }, animationDuration);
+}
+
 
 // Initialisation
 async function initializeApp() {
@@ -294,8 +350,8 @@ function logoutUser() {
     strongestOpponentRecordDisplay.textContent = '';
     bestTeammateDisplay.textContent = 'N/A';
     bestTeammateMatchesDisplay.textContent = '';
-    easiestOpponentDisplay.textContent = 'N/A'; // Ajout
-    easiestOpponentRecordDisplay.textContent = ''; // Ajout
+    easiestOpponentDisplay.textContent = 'N/A';
+    easiestOpponentRecordDisplay.textContent = '';
 
 
     if (loggedInUserDisplay) {
@@ -755,6 +811,105 @@ function updateTeamMateOptions() {
     }
 }
 
+// Helper function to calculate strongest opponent
+function calculateStrongestOpponent(opponentStats) {
+    if (!opponentStats || Object.keys(opponentStats).length === 0) {
+        return null;
+    }
+
+    let strongest = null;
+    let minWinRateAgainst = 101; // Higher than 100 to ensure first opponent is picked
+
+    for (const opponentId in opponentStats) {
+        const stats = opponentStats[opponentId];
+        // Calculate win rate against this opponent
+        const totalGames = stats.wins_against + stats.losses_against;
+        if (totalGames === 0) continue; // Skip if no games played against this opponent
+
+        const winRate = (stats.wins_against / totalGames) * 100;
+
+        // A "strongest" opponent is one you have a low win rate against,
+        // or if win rates are equal, one you have more losses against.
+        if (winRate < minWinRateAgainst || (winRate === minWinRateAgainst && stats.losses_against > (strongest ? strongest.losses_against : -1))) {
+            const opponentUser = users.find(u => u.id === parseInt(opponentId));
+            if (opponentUser) {
+                strongest = {
+                    opponent_id: parseInt(opponentId),
+                    opponent_name: opponentUser.name,
+                    opponent_surname: opponentUser.surname,
+                    wins_against: stats.wins_against,
+                    losses_against: stats.losses_against,
+                    win_rate_against: winRate
+                };
+                minWinRateAgainst = winRate;
+            }
+        }
+    }
+    return strongest;
+}
+
+// Helper function to calculate easiest opponent
+function calculateEasiestOpponent(opponentStats) {
+    if (!opponentStats || Object.keys(opponentStats).length === 0) {
+        return null;
+    }
+
+    let easiest = null;
+    let maxWinRateAgainst = -1; // Lower than 0 to ensure first opponent is picked
+
+    for (const opponentId in opponentStats) {
+        const stats = opponentStats[opponentId];
+        const totalGames = stats.wins_against + stats.losses_against;
+        if (totalGames === 0) continue;
+
+        const winRate = (stats.wins_against / totalGames) * 100;
+
+        // An "easiest" opponent is one you have a high win rate against,
+        // or if win rates are equal, one you have more wins against.
+        if (winRate > maxWinRateAgainst || (winRate === maxWinRateAgainst && stats.wins_against > (easiest ? easiest.wins_against : -1))) {
+            const opponentUser = users.find(u => u.id === parseInt(opponentId));
+            if (opponentUser) {
+                easiest = {
+                    opponent_id: parseInt(opponentId),
+                    opponent_name: opponentUser.name,
+                    opponent_surname: opponentUser.surname,
+                    wins_against: stats.wins_against,
+                    losses_against: stats.losses_against,
+                    win_rate_against: winRate
+                };
+                maxWinRateAgainst = winRate;
+            }
+        }
+    }
+    return easiest;
+}
+
+// Helper function to calculate best teammate
+function calculateBestTeammate(teammateStats) {
+    if (!teammateStats || Object.keys(teammateStats).length === 0) {
+        return null;
+    }
+
+    let best = null;
+    let maxMatchesTogether = 0;
+
+    for (const teammateId in teammateStats) {
+        const stats = teammateStats[teammateId];
+        if (stats.matches_together > maxMatchesTogether) {
+            const teammateUser = users.find(u => u.id === parseInt(teammateId));
+            if (teammateUser) {
+                best = {
+                    teammate_id: parseInt(teammateId),
+                    teammate_name: teammateUser.name,
+                    teammate_surname: teammateUser.surname,
+                    matches_together: stats.matches_together
+                };
+                maxMatchesTogether = stats.matches_together;
+            }
+        }
+    }
+    return best;
+}
 
 // MODIFIED: Update Dashboard Function to include personal stats
 async function updateDashboard() {
@@ -806,7 +961,7 @@ async function updateDashboard() {
         } catch (error) {
             console.error('Error loading personal stats:', error);
             showToast('Erreur lors du chargement de vos statistiques personnelles.', 'error');
-            // Clear personal stats fields if there's an error
+            // Clear personal stats if there's an error
             personalTotalMatches.textContent = '0';
             personalWins.textContent = '0';
             personalLosses.textContent = '0';
@@ -815,151 +970,48 @@ async function updateDashboard() {
             strongestOpponentRecordDisplay.textContent = '';
             bestTeammateDisplay.textContent = 'N/A';
             bestTeammateMatchesDisplay.textContent = '';
-            easiestOpponentDisplay.textContent = 'N/A'; // Ajout
-            easiestOpponentRecordDisplay.textContent = ''; // Ajout
+            easiestOpponentDisplay.textContent = 'N/A';
+            easiestOpponentRecordDisplay.textContent = '';
         } finally {
             hideLoading();
         }
     }
 }
 
-// NEW: Helper function to find the strongest opponent
-function calculateStrongestOpponent(opponentStats) {
-    if (!opponentStats || opponentStats.length === 0) {
-        return null;
-    }
-
-    let strongest = null;
-    let highestLossRate = -1; // We want the opponent you lose to most often
-
-    opponentStats.forEach(opponent => {
-        if (opponent.total_games_against > 0) {
-            const lossRate = opponent.losses_against / opponent.total_games_against;
-            if (lossRate > highestLossRate) {
-                highestLossRate = lossRate;
-                strongest = opponent;
-            }
-        }
-    });
-    return strongest;
-}
-
-// NEW: Helper function to find the best teammate (most matches played together)
-function calculateBestTeammate(teammateStats) {
-    if (!teammateStats || teammateStats.length === 0) {
-        return null;
-    }
-
-    let best = null;
-    let maxMatches = -1;
-
-    teammateStats.forEach(teammate => {
-        if (teammate.matches_together > maxMatches) {
-            maxMatches = teammate.matches_together;
-            best = teammate;
-        }
-    });
-    return best;
-}
-
-// NEW: Helper function to find the easiest opponent (highest win rate against)
-function calculateEasiestOpponent(opponentStats) {
-    if (!opponentStats || opponentStats.length === 0) {
-        return null;
-    }
-
-    let easiest = null;
-    let highestWinRate = -1; // On veut l'adversaire contre qui on gagne le plus souvent
-
-    opponentStats.forEach(opponent => {
-        if (opponent.total_games_against > 0 && opponent.wins_against > 0) {
-            const winRate = opponent.wins_against / opponent.total_games_against;
-            if (winRate > highestWinRate) {
-                highestWinRate = winRate;
-                easiest = opponent;
-            }
-        }
-    });
-    return easiest;
-}
-
-
-// --- Utility Functions (Toast, Loading) ---
-function showLoading() {
-    loading.style.display = 'flex';
-}
-
-function hideLoading() {
-    loading.style.display = 'none';
-}
-
-function showToast(message, type = 'info') {
-    const toastContainer = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.classList.add('toast', type);
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('hide');
-        toast.addEventListener('transitionend', () => {
-            toast.remove();
-        });
-    }, 3000); // Hide after 3 seconds
-}
-
-// Function to handle editing a user (called from displayUsers)
-function editUser(userId) {
+// Global function to be called from inline HTML (edit/delete buttons)
+window.editUser = function(userId) {
     openUserModal(userId);
-}
+};
 
-// --- Ping Pong Intro Animation ---
-function startPingPongIntroAnimation() {
-    const canvas = document.getElementById('pingpong-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let ballX = 200, ballY = 100, ballDX = 2, ballDY = 1.2, ballRadius = 8;
-    let leftPaddleY = 80, rightPaddleY = 80, paddleHeight = 40, paddleWidth = 10;
-    let frame = 0, maxFrames = 120;
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw paddles
-        ctx.fillStyle = '#191970';
-        ctx.fillRect(30, leftPaddleY, paddleWidth, paddleHeight);
-        ctx.fillRect(360, rightPaddleY, paddleWidth, paddleHeight);
-
-        // Draw ball
-        ctx.beginPath();
-        ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
-        ctx.fillStyle = '#e25822';
-        ctx.fill();
-
-        // Animate ball
-        ballX += ballDX;
-        ballY += ballDY;
-
-        // Bounce on top/bottom
-        if (ballY - ballRadius < 0 || ballY + ballRadius > canvas.height) ballDY *= -1;
-
-        // Bounce on paddles
-        if (ballX - ballRadius < 40 && ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) ballDX *= -1;
-        if (ballX + ballRadius > 360 && ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) ballDX *= -1;
-
-        // Move paddles (simple AI)
-        leftPaddleY += (ballY - (leftPaddleY + paddleHeight / 2)) * 0.08;
-        rightPaddleY += (ballY - (rightPaddleY + paddleHeight / 2)) * 0.08;
-
-        frame++;
-        if (frame < maxFrames) {
-            requestAnimationFrame(draw);
-        } else {
-            document.getElementById('intro-animation').classList.add('hide');
-            setTimeout(() => {
-                document.getElementById('intro-animation').style.display = 'none';
-            }, 700);
-        }
+window.deleteUser = function(userId) {
+    // Implement a custom confirmation dialog here instead of `confirm()`
+    // For now, directly call deleteUser for brevity, but a modal is recommended.
+    // Example: showCustomConfirm('Are you sure you want to delete this user?', () => deleteUserConfirmed(userId));
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce joueur ?")) {
+        deleteUserConfirmed(userId);
     }
-    draw();
+};
+
+async function deleteUserConfirmed(userId) {
+    showLoading();
+    try {
+        const response = await authenticatedFetch(`${API_BASE}/users/${userId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la suppression du joueur');
+        }
+
+        await loadUsers();
+        await loadMatches();
+        updateDashboard();
+        populatePlayerSelectsForMatch();
+        showToast('Joueur supprimé avec succès!', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
