@@ -52,6 +52,7 @@ const easiestOpponentRecordDisplay = document.getElementById('easiest-opponent-r
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
     setupEventListeners();
+    startPingPongIntroAnimation(); // Start the animation on load
 });
 
 // Initialisation
@@ -666,7 +667,6 @@ function toggleMatchFormFields() {
     updateTeamMateOptions(); 
 }
 
-
 // NEW: populatePlayerSelectsForMatch
 function populatePlayerSelectsForMatch() {
     // Clear previous options
@@ -911,4 +911,55 @@ function showToast(message, type = 'info') {
 // Function to handle editing a user (called from displayUsers)
 function editUser(userId) {
     openUserModal(userId);
+}
+
+// --- Ping Pong Intro Animation ---
+function startPingPongIntroAnimation() {
+    const canvas = document.getElementById('pingpong-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let ballX = 200, ballY = 100, ballDX = 2, ballDY = 1.2, ballRadius = 8;
+    let leftPaddleY = 80, rightPaddleY = 80, paddleHeight = 40, paddleWidth = 10;
+    let frame = 0, maxFrames = 120;
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw paddles
+        ctx.fillStyle = '#191970';
+        ctx.fillRect(30, leftPaddleY, paddleWidth, paddleHeight);
+        ctx.fillRect(360, rightPaddleY, paddleWidth, paddleHeight);
+
+        // Draw ball
+        ctx.beginPath();
+        ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = '#e25822';
+        ctx.fill();
+
+        // Animate ball
+        ballX += ballDX;
+        ballY += ballDY;
+
+        // Bounce on top/bottom
+        if (ballY - ballRadius < 0 || ballY + ballRadius > canvas.height) ballDY *= -1;
+
+        // Bounce on paddles
+        if (ballX - ballRadius < 40 && ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) ballDX *= -1;
+        if (ballX + ballRadius > 360 && ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) ballDX *= -1;
+
+        // Move paddles (simple AI)
+        leftPaddleY += (ballY - (leftPaddleY + paddleHeight / 2)) * 0.08;
+        rightPaddleY += (ballY - (rightPaddleY + paddleHeight / 2)) * 0.08;
+
+        frame++;
+        if (frame < maxFrames) {
+            requestAnimationFrame(draw);
+        } else {
+            document.getElementById('intro-animation').classList.add('hide');
+            setTimeout(() => {
+                document.getElementById('intro-animation').style.display = 'none';
+            }, 700);
+        }
+    }
+    draw();
 }
