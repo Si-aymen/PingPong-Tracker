@@ -99,7 +99,16 @@
 
                 <div class="recent-matches">
                     <h2><i class="fas fa-history"></i> Matchs récents</h2>
+                    <div class="recent-matches-controls" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 16px; flex-wrap: wrap;">
+                        <input type="text" id="recent-matches-search" class="form-control" placeholder="Rechercher un joueur, score ou date..." style="flex:1; min-width:220px; max-width:340px; padding:10px 14px; border-radius:8px; border:1px solid #ddd; font-size:1rem;">
+                        <div class="recent-matches-paginator" style="display: flex; align-items: center; gap: 8px;">
+                            <button id="recent-matches-prev" class="btn btn-secondary btn-sm" style="min-width:38px;" title="Page précédente"><i class="fas fa-chevron-left"></i></button>
+                            <span id="recent-matches-page-info" style="font-weight:600; color:#191970; min-width:60px; text-align:center;">1 / 1</span>
+                            <button id="recent-matches-next" class="btn btn-secondary btn-sm" style="min-width:38px;" title="Page suivante"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                     <ul id="recent-matches-list" class="recent-matches-list">
+                        <!-- Matches will be rendered here -->
                     </ul>
                 </div>
             </div>

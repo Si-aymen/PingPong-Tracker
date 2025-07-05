@@ -158,6 +158,30 @@ function setupEventListeners() {
     player2Select.addEventListener('change', updateTeamMateOptions);
     player1TeamMateSelect.addEventListener('change', updateTeamMateOptions);
     player2TeamMateSelect.addEventListener('change', updateTeamMateOptions);
+
+    // --- Recent Matches Pagination & Search ---
+    const searchInput = document.getElementById('recent-matches-search');
+    const prevBtn = document.getElementById('recent-matches-prev');
+    const nextBtn = document.getElementById('recent-matches-next');
+    if (searchInput && prevBtn && nextBtn) {
+        searchInput.addEventListener('input', function() {
+            recentMatchesPage = 1;
+            renderRecentMatches();
+        });
+        prevBtn.addEventListener('click', function() {
+            if (recentMatchesPage > 1) {
+                recentMatchesPage--;
+                renderRecentMatches();
+            }
+        });
+        nextBtn.addEventListener('click', function() {
+            const totalPages = Math.max(1, Math.ceil(recentMatchesFiltered.length / recentMatchesPerPage));
+            if (recentMatchesPage < totalPages) {
+                recentMatchesPage++;
+                renderRecentMatches();
+            }
+        });
+    }
 }
 
 // --- UI Display Functions ---
@@ -491,6 +515,117 @@ function displayRecentMatches() {
     });
 }
 
+// --- Recent Matches Pagination & Search ---
+let recentMatchesPage = 1;
+const recentMatchesPerPage = 5;
+let recentMatchesFiltered = [];
+
+function filterRecentMatches(query) {
+    if (!query) return matches;
+    const q = query.trim().toLowerCase();
+    return matches.filter(match => {
+        // Search by player names, scores, or date
+        const p1 = getUserNameById(match.player1_id);
+        const p2 = getUserNameById(match.player2_id);
+        const p1tm = match.player1_team_mate_id ? getUserNameById(match.player1_team_mate_id) : '';
+        const p2tm = match.player2_team_mate_id ? getUserNameById(match.player2_team_mate_id) : '';
+        const date = match.date ? new Date(match.date).toLocaleDateString('fr-FR') : '';
+        return (
+            (p1 && p1.toLowerCase().includes(q)) ||
+            (p2 && p2.toLowerCase().includes(q)) ||
+            (p1tm && p1tm.toLowerCase().includes(q)) ||
+            (p2tm && p2tm.toLowerCase().includes(q)) ||
+            (match.player1_score+'' || '').includes(q) ||
+            (match.player2_score+'' || '').includes(q) ||
+            (date && date.includes(q))
+        );
+    });
+}
+
+function renderRecentMatches() {
+    const searchInput = document.getElementById('recent-matches-search');
+    const pageInfo = document.getElementById('recent-matches-page-info');
+    const list = document.getElementById('recent-matches-list');
+    const query = searchInput ? searchInput.value : '';
+    recentMatchesFiltered = filterRecentMatches(query);
+    const total = recentMatchesFiltered.length;
+    const totalPages = Math.max(1, Math.ceil(total / recentMatchesPerPage));
+    if (recentMatchesPage > totalPages) recentMatchesPage = totalPages;
+    if (recentMatchesPage < 1) recentMatchesPage = 1;
+    const start = (recentMatchesPage-1)*recentMatchesPerPage;
+    const end = start + recentMatchesPerPage;
+    const pageMatches = recentMatchesFiltered.slice(start, end);
+    list.innerHTML = '';
+    pageMatches.forEach(match => {
+        list.appendChild(renderRecentMatchItem(match));
+    });
+    pageInfo.textContent = `${recentMatchesPage} / ${totalPages}`;
+    document.getElementById('recent-matches-prev').disabled = recentMatchesPage === 1;
+    document.getElementById('recent-matches-next').disabled = recentMatchesPage === totalPages;
+}
+
+function renderRecentMatchItem(match) {
+    // ...existing code for rendering a match item...
+    // For now, reuse displayRecentMatches logic, but as a <li> element
+    const li = document.createElement('li');
+    const p1 = getUserNameById(match.player1_id);
+    const p2 = getUserNameById(match.player2_id);
+    const p1tm = match.player1_team_mate_id ? getUserNameById(match.player1_team_mate_id) : null;
+    const p2tm = match.player2_team_mate_id ? getUserNameById(match.player2_team_mate_id) : null;
+    const date = match.date ? new Date(match.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+    const winner = match.winner_id ? getUserNameById(match.winner_id) : '';
+    li.innerHTML = `
+        <div class="match-info">
+            <span>${p1}${p1tm ? ' & ' + p1tm : ''}</span>
+            <span class="vs">VS</span>
+            <span>${p2}${p2tm ? ' & ' + p2tm : ''}</span>
+        </div>
+        <div class="match-meta">
+            <span><i class="fas fa-trophy" style="color:#ff69b4"></i> ${winner}</span>
+            <span><i class="fas fa-star"></i> ${match.player1_score} - ${match.player2_score}</span>
+            <span><i class="fas fa-calendar-alt"></i> ${date}</span>
+        </div>
+    `;
+    return li;
+}
+
+function getUserNameById(id) {
+    const u = users.find(u => u.id === id);
+    return u ? `${u.name} ${u.surname}` : '';
+}
+
+// --- Hook up paginator and search events ---
+document.addEventListener('DOMContentLoaded', function() {
+    // ...existing code...
+    const searchInput = document.getElementById('recent-matches-search');
+    const prevBtn = document.getElementById('recent-matches-prev');
+    const nextBtn = document.getElementById('recent-matches-next');
+    if (searchInput && prevBtn && nextBtn) {
+        searchInput.addEventListener('input', function() {
+            recentMatchesPage = 1;
+            renderRecentMatches();
+        });
+        prevBtn.addEventListener('click', function() {
+            if (recentMatchesPage > 1) {
+                recentMatchesPage--;
+                renderRecentMatches();
+            }
+        });
+        nextBtn.addEventListener('click', function() {
+            const totalPages = Math.max(1, Math.ceil(recentMatchesFiltered.length / recentMatchesPerPage));
+            if (recentMatchesPage < totalPages) {
+                recentMatchesPage++;
+                renderRecentMatches();
+            }
+        });
+    }
+});
+
+// --- Update displayRecentMatches to use paginator ---
+function displayRecentMatches() {
+    renderRecentMatches();
+}
+
 async function handleMatchSubmit(event) {
     event.preventDefault();
     showLoading();
@@ -754,7 +889,6 @@ function updateTeamMateOptions() {
         player2TeamMateSelect.value = '';
     }
 }
-
 
 // MODIFIED: Update Dashboard Function to include personal stats
 async function updateDashboard() {
