@@ -915,51 +915,142 @@ function editUser(userId) {
 
 // --- Ping Pong Intro Animation ---
 function startPingPongIntroAnimation() {
+    const overlay = document.getElementById('intro-animation');
     const canvas = document.getElementById('pingpong-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let ballX = 200, ballY = 100, ballDX = 2, ballDY = 1.2, ballRadius = 8;
-    let leftPaddleY = 80, rightPaddleY = 80, paddleHeight = 40, paddleWidth = 10;
-    let frame = 0, maxFrames = 120;
+    const w = canvas.width;
+    const h = canvas.height;
 
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Ball and paddle properties
+    let ball = { x: w/2, y: h/2, r: 28, dx: 7.2, dy: 3.7 };
+    let paddleL = { x: 60, y: h/2-90, w: 28, h: 180, color: '#fff' };
+    let paddleR = { x: w-88, y: h/2-90, w: 28, h: 180, color: '#ff69b4' };
+    let paddleLDir = 1, paddleRDir = -1;
+    let paddleSpeed = 3.2;
+    let animFrame;
+    let bounceCount = 0;
+    let maxBounces = 12;
+    let bgGradient = ctx.createLinearGradient(0,0,w,h);
+    bgGradient.addColorStop(0, '#191970');
+    bgGradient.addColorStop(0.5, '#3f51b5');
+    bgGradient.addColorStop(1, '#ff69b4');
 
-        // Draw paddles
-        ctx.fillStyle = '#191970';
-        ctx.fillRect(30, leftPaddleY, paddleWidth, paddleHeight);
-        ctx.fillRect(360, rightPaddleY, paddleWidth, paddleHeight);
-
-        // Draw ball
+    function drawTable() {
+        // Table background
+        ctx.clearRect(0,0,w,h);
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0,0,w,h);
+        ctx.restore();
+        // Net
+        ctx.setLineDash([16, 16]);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
-        ctx.fillStyle = '#e25822';
+        ctx.moveTo(w/2, 60);
+        ctx.lineTo(w/2, h-60);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Glow effect
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.beginPath();
+        ctx.arc(w/2, h/2, h/2.2, 0, 2*Math.PI);
+        ctx.fillStyle = '#fff';
         ctx.fill();
+        ctx.restore();
+    }
 
-        // Animate ball
-        ballX += ballDX;
-        ballY += ballDY;
+    function drawPaddle(p) {
+        ctx.save();
+        ctx.shadowColor = p.color === '#ff69b4' ? '#ff69b4' : '#191970';
+        ctx.shadowBlur = 32;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.restore();
+        // Paddle shine
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(p.x + p.w/2, p.y + 10, 6, p.h-20);
+        ctx.restore();
+    }
 
-        // Bounce on top/bottom
-        if (ballY - ballRadius < 0 || ballY + ballRadius > canvas.height) ballDY *= -1;
+    function drawBall() {
+        ctx.save();
+        ctx.shadowColor = '#ff69b4';
+        ctx.shadowBlur = 32;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.r, 0, 2*Math.PI);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = '#ff69b4';
+        ctx.stroke();
+        ctx.restore();
+        // Ball highlight
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.arc(ball.x-8, ball.y-8, ball.r/2, 0, 2*Math.PI);
+        ctx.fillStyle = '#ff69b4';
+        ctx.fill();
+        ctx.restore();
+    }
 
-        // Bounce on paddles
-        if (ballX - ballRadius < 40 && ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) ballDX *= -1;
-        if (ballX + ballRadius > 360 && ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) ballDX *= -1;
+    function animate() {
+        drawTable();
+        drawPaddle(paddleL);
+        drawPaddle(paddleR);
+        drawBall();
 
-        // Move paddles (simple AI)
-        leftPaddleY += (ballY - (leftPaddleY + paddleHeight / 2)) * 0.08;
-        rightPaddleY += (ballY - (rightPaddleY + paddleHeight / 2)) * 0.08;
+        // Ball movement
+        ball.x += ball.dx;
+        ball.y += ball.dy;
+        // Bounce off top/bottom
+        if (ball.y - ball.r < 0 || ball.y + ball.r > h) ball.dy *= -1;
+        // Bounce off left paddle
+        if (
+            ball.x - ball.r < paddleL.x + paddleL.w &&
+            ball.y > paddleL.y &&
+            ball.y < paddleL.y + paddleL.h &&
+            ball.dx < 0
+        ) {
+            ball.dx *= -1.08;
+            ball.dy += (Math.random()-0.5)*3.2;
+            bounceCount++;
+        }
+        // Bounce off right paddle
+        if (
+            ball.x + ball.r > paddleR.x &&
+            ball.y > paddleR.y &&
+            ball.y < paddleR.y + paddleR.h &&
+            ball.dx > 0
+        ) {
+            ball.dx *= -1.08;
+            ball.dy += (Math.random()-0.5)*3.2;
+            bounceCount++;
+        }
+        // Bounce off left/right wall
+        if (ball.x - ball.r < 0 || ball.x + ball.r > w) ball.dx *= -1;
 
-        frame++;
-        if (frame < maxFrames) {
-            requestAnimationFrame(draw);
+        // Paddle movement (gentle up and down)
+        paddleL.y += paddleLDir * paddleSpeed;
+        paddleR.y += paddleRDir * paddleSpeed * 0.9;
+        if (paddleL.y < 60 || paddleL.y + paddleL.h > h-60) paddleLDir *= -1;
+        if (paddleR.y < 60 || paddleR.y + paddleR.h > h-60) paddleRDir *= -1;
+
+        // End animation after a few bounces
+        if (bounceCount < maxBounces) {
+            animFrame = requestAnimationFrame(animate);
         } else {
-            document.getElementById('intro-animation').classList.add('hide');
             setTimeout(() => {
-                document.getElementById('intro-animation').style.display = 'none';
+                overlay.classList.add('hide');
+                setTimeout(() => overlay.style.display = 'none', 700);
             }, 700);
         }
     }
-    draw();
+    animate();
 }
